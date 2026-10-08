@@ -9,6 +9,209 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Read chat moderation configuration, sanctions and recent history (admins only)
+ */
+
+
+
+export const GetChatBotParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const getChatBotResponseSettingsMaxMessagesMin = 2;
+export const getChatBotResponseSettingsMaxMessagesMax = 30;
+
+export const getChatBotResponseSettingsWindowSecondsMin = 3;
+export const getChatBotResponseSettingsWindowSecondsMax = 120;
+
+export const getChatBotResponseSettingsAllowedDomainsItemMax = 253;
+
+export const getChatBotResponseSettingsAllowedDomainsMax = 100;
+
+export const getChatBotResponseSettingsWordsItemMax = 80;
+
+export const getChatBotResponseSettingsWordsMax = 100;
+
+export const getChatBotResponseSettingsWarnBeforeMuteMax = 10;
+
+export const getChatBotResponseSettingsWarnBeforeBanMin = 2;
+export const getChatBotResponseSettingsWarnBeforeBanMax = 30;
+
+export const getChatBotResponseSettingsMuteMinutesMax = 1440;
+
+export const getChatBotResponseSettingsRulesMax = 2000;
+
+export const getChatBotResponseSettingsWelcomeMessageMax = 1000;
+
+
+
+export const GetChatBotResponse = zod.object({
+  "settings": zod.object({
+  "enabled": zod.boolean(),
+  "antiSpam": zod.boolean(),
+  "maxMessages": zod.number().min(getChatBotResponseSettingsMaxMessagesMin).max(getChatBotResponseSettingsMaxMessagesMax),
+  "windowSeconds": zod.number().min(getChatBotResponseSettingsWindowSecondsMin).max(getChatBotResponseSettingsWindowSecondsMax),
+  "blockLinks": zod.boolean(),
+  "allowedDomains": zod.array(zod.string().max(getChatBotResponseSettingsAllowedDomainsItemMax)).max(getChatBotResponseSettingsAllowedDomainsMax),
+  "words": zod.array(zod.string().min(1).max(getChatBotResponseSettingsWordsItemMax)).max(getChatBotResponseSettingsWordsMax),
+  "warnBeforeMute": zod.number().min(1).max(getChatBotResponseSettingsWarnBeforeMuteMax),
+  "warnBeforeBan": zod.number().min(getChatBotResponseSettingsWarnBeforeBanMin).max(getChatBotResponseSettingsWarnBeforeBanMax).describe('Must exceed warnBeforeMute'),
+  "muteMinutes": zod.number().min(1).max(getChatBotResponseSettingsMuteMinutesMax),
+  "rules": zod.string().max(getChatBotResponseSettingsRulesMax),
+  "welcomeMessage": zod.string().max(getChatBotResponseSettingsWelcomeMessageMax)
+}),
+  "logs": zod.array(zod.object({
+  "id": zod.number(),
+  "action": zod.string(),
+  "targetUserId": zod.number().nullable(),
+  "actorId": zod.number().nullable(),
+  "detail": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "sanctions": zod.array(zod.object({
+  "userId": zod.number(),
+  "name": zod.string(),
+  "warnings": zod.number(),
+  "mutedUntil": zod.coerce.date().nullable(),
+  "banned": zod.boolean()
+})),
+  "members": zod.array(zod.object({
+  "userId": zod.number(),
+  "name": zod.string(),
+  "role": zod.enum(['owner', 'admin', 'member'])
+}))
+})
+
+
+/**
+ * @summary Configure the chat moderation bot (admins only)
+ */
+
+
+
+export const UpdateChatBotParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const updateChatBotBodyMaxMessagesMin = 2;
+export const updateChatBotBodyMaxMessagesMax = 30;
+
+export const updateChatBotBodyWindowSecondsMin = 3;
+export const updateChatBotBodyWindowSecondsMax = 120;
+
+export const updateChatBotBodyAllowedDomainsItemMax = 253;
+
+export const updateChatBotBodyAllowedDomainsMax = 100;
+
+export const updateChatBotBodyWordsItemMax = 80;
+
+export const updateChatBotBodyWordsMax = 100;
+
+export const updateChatBotBodyWarnBeforeMuteMax = 10;
+
+export const updateChatBotBodyWarnBeforeBanMin = 2;
+export const updateChatBotBodyWarnBeforeBanMax = 30;
+
+export const updateChatBotBodyMuteMinutesMax = 1440;
+
+export const updateChatBotBodyRulesMax = 2000;
+
+export const updateChatBotBodyWelcomeMessageMax = 1000;
+
+
+
+export const UpdateChatBotBody = zod.object({
+  "enabled": zod.boolean(),
+  "antiSpam": zod.boolean(),
+  "maxMessages": zod.number().min(updateChatBotBodyMaxMessagesMin).max(updateChatBotBodyMaxMessagesMax),
+  "windowSeconds": zod.number().min(updateChatBotBodyWindowSecondsMin).max(updateChatBotBodyWindowSecondsMax),
+  "blockLinks": zod.boolean(),
+  "allowedDomains": zod.array(zod.string().max(updateChatBotBodyAllowedDomainsItemMax)).max(updateChatBotBodyAllowedDomainsMax),
+  "words": zod.array(zod.string().min(1).max(updateChatBotBodyWordsItemMax)).max(updateChatBotBodyWordsMax),
+  "warnBeforeMute": zod.number().min(1).max(updateChatBotBodyWarnBeforeMuteMax),
+  "warnBeforeBan": zod.number().min(updateChatBotBodyWarnBeforeBanMin).max(updateChatBotBodyWarnBeforeBanMax).describe('Must exceed warnBeforeMute'),
+  "muteMinutes": zod.number().min(1).max(updateChatBotBodyMuteMinutesMax),
+  "rules": zod.string().max(updateChatBotBodyRulesMax),
+  "welcomeMessage": zod.string().max(updateChatBotBodyWelcomeMessageMax)
+})
+
+export const updateChatBotResponseSettingsMaxMessagesMin = 2;
+export const updateChatBotResponseSettingsMaxMessagesMax = 30;
+
+export const updateChatBotResponseSettingsWindowSecondsMin = 3;
+export const updateChatBotResponseSettingsWindowSecondsMax = 120;
+
+export const updateChatBotResponseSettingsAllowedDomainsItemMax = 253;
+
+export const updateChatBotResponseSettingsAllowedDomainsMax = 100;
+
+export const updateChatBotResponseSettingsWordsItemMax = 80;
+
+export const updateChatBotResponseSettingsWordsMax = 100;
+
+export const updateChatBotResponseSettingsWarnBeforeMuteMax = 10;
+
+export const updateChatBotResponseSettingsWarnBeforeBanMin = 2;
+export const updateChatBotResponseSettingsWarnBeforeBanMax = 30;
+
+export const updateChatBotResponseSettingsMuteMinutesMax = 1440;
+
+export const updateChatBotResponseSettingsRulesMax = 2000;
+
+export const updateChatBotResponseSettingsWelcomeMessageMax = 1000;
+
+
+
+export const UpdateChatBotResponse = zod.object({
+  "settings": zod.object({
+  "enabled": zod.boolean(),
+  "antiSpam": zod.boolean(),
+  "maxMessages": zod.number().min(updateChatBotResponseSettingsMaxMessagesMin).max(updateChatBotResponseSettingsMaxMessagesMax),
+  "windowSeconds": zod.number().min(updateChatBotResponseSettingsWindowSecondsMin).max(updateChatBotResponseSettingsWindowSecondsMax),
+  "blockLinks": zod.boolean(),
+  "allowedDomains": zod.array(zod.string().max(updateChatBotResponseSettingsAllowedDomainsItemMax)).max(updateChatBotResponseSettingsAllowedDomainsMax),
+  "words": zod.array(zod.string().min(1).max(updateChatBotResponseSettingsWordsItemMax)).max(updateChatBotResponseSettingsWordsMax),
+  "warnBeforeMute": zod.number().min(1).max(updateChatBotResponseSettingsWarnBeforeMuteMax),
+  "warnBeforeBan": zod.number().min(updateChatBotResponseSettingsWarnBeforeBanMin).max(updateChatBotResponseSettingsWarnBeforeBanMax).describe('Must exceed warnBeforeMute'),
+  "muteMinutes": zod.number().min(1).max(updateChatBotResponseSettingsMuteMinutesMax),
+  "rules": zod.string().max(updateChatBotResponseSettingsRulesMax),
+  "welcomeMessage": zod.string().max(updateChatBotResponseSettingsWelcomeMessageMax)
+})
+})
+
+
+/**
+ * @summary Apply or undo a moderation sanction, or delete a message
+ */
+
+
+
+export const RunChatBotActionParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+export const runChatBotActionBodyDurationMinutesMax = 1440;
+
+export const runChatBotActionBodyReasonMax = 500;
+
+
+
+export const RunChatBotActionBody = zod.object({
+  "action": zod.enum(['warn', 'mute', 'unmute', 'ban', 'unban', 'reset', 'delete']),
+  "targetUserId": zod.number().min(1).optional(),
+  "messageId": zod.number().min(1).optional(),
+  "durationMinutes": zod.number().min(1).max(runChatBotActionBodyDurationMinutesMax).optional(),
+  "reason": zod.string().max(runChatBotActionBodyReasonMax).optional()
+})
+
+export const RunChatBotActionResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
  * @summary Refresh or close the authenticated browser session presence lease
  */
 export const UpdatePresenceSessionBody = zod.object({

@@ -5,6 +5,7 @@ import { eq, and, inArray, desc } from "drizzle-orm";
 import { pushToUserDevice } from "./push";
 import { assertChatGroupAdminOrOwner } from "../lib/groupAuth";
 import { sql } from "drizzle-orm";
+import { moderatedChatMessage, addChatMember, addChatMembers, BotError } from "../lib/chatBot";
 
 const router = Router();
 
@@ -163,14 +164,14 @@ router.get("/chat-groups/:id/messages", requireAuth, async (req, res): Promise<v
   }).from(chatGroupMessagesTable)
     .leftJoin(usersTable, eq(chatGroupMessagesTable.senderId, usersTable.id))
     .where(eq(chatGroupMessagesTable.groupId, id))
-    .orderBy(chatGroupMessagesTable.createdAt)
+    .orderBy(desc(chatGroupMessagesTable.id))
     .limit(200);
 
-  res.json(msgs.map(m => ({
+  res.json(msgs.reverse().map(m => ({
     id: m.id, groupId: m.groupId, senderId: m.senderId,
     content: m.content, type: m.type,
     createdAt: m.createdAt.toISOString(),
-    senderName: m.firstName && m.lastName ? `${m.firstName} ${m.lastName}` : `#${m.senderId}`,
+    senderName: m.senderId === 0 ? "BrutePawa Bot" : m.firstName && m.lastName ? `${m.firstName} ${m.lastName}` : `#${m.senderId}`,
   })));
 });
 
@@ -180,15 +181,27 @@ router.post("/chat-groups/:id/messages", requireAuth, async (req, res): Promise<
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const { content } = req.body as { content: string };
-  if (!content || content.trim().length === 0) { res.status(400).json({ error: "Contenu requis" }); return; }
+  if (typeof content !== "string" || content.trim().length === 0 || content.length > 20_000) { res.status(400).json({ error: "Le message doit contenir entre 1 et 20 000 caractères" }); return; }
 
   const [membership] = await db.select().from(chatGroupMembersTable)
     .where(and(eq(chatGroupMembersTable.groupId, id), eq(chatGroupMembersTable.userId, me)));
   if (!membership) { res.status(403).json({ error: "Accès refusé" }); return; }
 
-  const [msg] = await db.insert(chatGroupMessagesTable).values({
-    groupId: id, senderId: me, content: content.trim(), type: "text",
-  }).returning();
+  let moderated;
+  try {
+    moderated = await moderatedChatMessage(id, me, content.trim());
+  } catch (error) {
+    if (!(error instanceof BotError)) throw error;
+    res.status(error.status).json({ error: error.message }); return;
+  }
+  if (moderated.blocked) {
+    res.status(422).json({ error: moderated.error, moderation: moderated.action }); return;
+  }
+  const msg = moderated.message;
+  if (moderated.bot) {
+    res.status(201).json({ ...msg, createdAt: msg.createdAt.toISOString(), senderName: "BrutePawa Bot" });
+    return;
+  }
 
   const [user] = await db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName })
     .from(usersTable).where(eq(usersTable.id, me));
@@ -277,11 +290,14 @@ router.post("/chat-groups/:id/members", requireAuth, async (req, res): Promise<v
   if (!membership) return;
 
   const { userIds } = req.body as { userIds: number[] };
-  if (!Array.isArray(userIds) || userIds.length === 0) { res.status(400).json({ error: "userIds requis" }); return; }
+  if (!Array.isArray(userIds) || userIds.length === 0 || userIds.length > 1000 || userIds.some(uid => !Number.isSafeInteger(uid) || uid <= 0)) { res.status(400).json({ error: "userIds requis (1 à 1000 identifiants valides)" }); return; }
 
-  await db.insert(chatGroupMembersTable).values(
-    userIds.map((uid: number) => ({ groupId: id, userId: uid, role: "member" as const }))
-  ).onConflictDoNothing();
+  try {
+    await addChatMembers(id, userIds);
+  } catch (error) {
+    if (!(error instanceof BotError)) throw error;
+    res.status(error.status).json({ error: error.message }); return;
+  }
 
   await logAudit(id, me, "member_added", undefined, `${userIds.length} membre(s) ajouté(s)`);
 
@@ -880,7 +896,12 @@ router.post("/invite/:code/join", requireAuth, async (req, res): Promise<void> =
   if (existing) { res.json({ groupId: group.id, groupName: group.name, alreadyMember: true }); return; }
 
   // Add member + increment uses_count atomically
-  await db.insert(chatGroupMembersTable).values({ groupId: link.groupId, userId: me, role: "member" });
+  try {
+    await addChatMember(link.groupId, me);
+  } catch (error) {
+    if (!(error instanceof BotError)) throw error;
+    res.status(error.status).json({ error: error.message }); return;
+  }
   await db.update(chatGroupInviteLinksTable)
     .set({ usesCount: sql`${chatGroupInviteLinksTable.usesCount} + 1` })
     .where(eq(chatGroupInviteLinksTable.id, link.id));

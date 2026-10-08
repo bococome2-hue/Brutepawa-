@@ -36,6 +36,7 @@ import giphyRouter from "./giphy";
 import pollsRouter from "./polls";
 import musicRouter from "./music";
 import chatActivityRouter from "./chatActivity";
+import chatBotRouter from "./chatBot";
 
 const router: IRouter = Router();
 
@@ -76,5 +77,6 @@ router.use(giphyRouter);
 router.use(pollsRouter);
 router.use(musicRouter);
 router.use(chatActivityRouter);
+router.use(chatBotRouter);
 
 export default router;

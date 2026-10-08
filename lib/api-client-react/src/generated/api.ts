@@ -24,6 +24,9 @@ import type {
   Application,
   ApplicationInput,
   AuthResponse,
+  ChatBotActionInput,
+  ChatBotSettings,
+  ChatBotState,
   ChatGroupTypingInput,
   Contribution,
   ContributionInput,
@@ -57,6 +60,7 @@ import type {
   ProductInput,
   ProductUpdate,
   RegisterInput,
+  RunChatBotAction200,
   SearchMusic200,
   SearchMusicParams,
   Tontine,
@@ -65,6 +69,7 @@ import type {
   TontineMember,
   Transaction,
   TransferInput,
+  UpdateChatBot200,
   User,
   UserStatusUpdate,
   UserUpdate,
@@ -83,6 +88,225 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getGetChatBotUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat-groups/${id}/bot`
+}
+
+/**
+ * @summary Read chat moderation configuration, sanctions and recent history (admins only)
+ */
+export const getChatBot = async (id: number, options?: RequestInit): Promise<ChatBotState> => {
+
+  return customFetch<ChatBotState>(getGetChatBotUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChatBotQueryKey = (id: number,) => {
+    return [
+    `/api/chat-groups/${id}/bot`
+    ] as const;
+    }
+
+
+export const getGetChatBotQueryOptions = <TData = Awaited<ReturnType<typeof getChatBot>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatBot>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChatBotQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChatBot>>> = ({ signal }) => getChatBot(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChatBot>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChatBotQueryResult = NonNullable<Awaited<ReturnType<typeof getChatBot>>>
+export type GetChatBotQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read chat moderation configuration, sanctions and recent history (admins only)
+ */
+
+export function useGetChatBot<TData = Awaited<ReturnType<typeof getChatBot>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatBot>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChatBotQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateChatBotUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat-groups/${id}/bot`
+}
+
+/**
+ * @summary Configure the chat moderation bot (admins only)
+ */
+export const updateChatBot = async (id: number,
+    chatBotSettings: ChatBotSettings, options?: RequestInit): Promise<UpdateChatBot200> => {
+
+  return customFetch<UpdateChatBot200>(getUpdateChatBotUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(chatBotSettings)
+  }
+);}
+
+
+
+
+export const getUpdateChatBotMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChatBot>>, TError,{id: number;data: BodyType<ChatBotSettings>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateChatBot>>, TError,{id: number;data: BodyType<ChatBotSettings>}, TContext> => {
+
+const mutationKey = ['updateChatBot'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateChatBot>>, {id: number;data: BodyType<ChatBotSettings>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateChatBot(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateChatBotMutationResult = NonNullable<Awaited<ReturnType<typeof updateChatBot>>>
+    export type UpdateChatBotMutationBody = BodyType<ChatBotSettings>
+    export type UpdateChatBotMutationError = ErrorType<void>
+
+    /**
+ * @summary Configure the chat moderation bot (admins only)
+ */
+export const useUpdateChatBot = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChatBot>>, TError,{id: number;data: BodyType<ChatBotSettings>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateChatBot>>,
+        TError,
+        {id: number;data: BodyType<ChatBotSettings>},
+        TContext
+      > => {
+      return useMutation(getUpdateChatBotMutationOptions(options));
+    }
+
+export const getRunChatBotActionUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat-groups/${id}/bot/actions`
+}
+
+/**
+ * @summary Apply or undo a moderation sanction, or delete a message
+ */
+export const runChatBotAction = async (id: number,
+    chatBotActionInput: ChatBotActionInput, options?: RequestInit): Promise<RunChatBotAction200> => {
+
+  return customFetch<RunChatBotAction200>(getRunChatBotActionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(chatBotActionInput)
+  }
+);}
+
+
+
+
+export const getRunChatBotActionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runChatBotAction>>, TError,{id: number;data: BodyType<ChatBotActionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runChatBotAction>>, TError,{id: number;data: BodyType<ChatBotActionInput>}, TContext> => {
+
+const mutationKey = ['runChatBotAction'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runChatBotAction>>, {id: number;data: BodyType<ChatBotActionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  runChatBotAction(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunChatBotActionMutationResult = NonNullable<Awaited<ReturnType<typeof runChatBotAction>>>
+    export type RunChatBotActionMutationBody = BodyType<ChatBotActionInput>
+    export type RunChatBotActionMutationError = ErrorType<void>
+
+    /**
+ * @summary Apply or undo a moderation sanction, or delete a message
+ */
+export const useRunChatBotAction = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runChatBotAction>>, TError,{id: number;data: BodyType<ChatBotActionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runChatBotAction>>,
+        TError,
+        {id: number;data: BodyType<ChatBotActionInput>},
+        TContext
+      > => {
+      return useMutation(getRunChatBotActionMutationOptions(options));
+    }
 
 export const getUpdatePresenceSessionUrl = () => {
 

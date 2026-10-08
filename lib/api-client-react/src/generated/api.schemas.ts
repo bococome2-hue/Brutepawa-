@@ -5,6 +5,120 @@
  * AfriConnect API - Super-app for West Africa
  * OpenAPI spec version: 0.1.0
  */
+export interface ChatBotSettings {
+  enabled: boolean;
+  antiSpam: boolean;
+  /**
+     * @minimum 2
+     * @maximum 30
+     */
+  maxMessages: number;
+  /**
+     * @minimum 3
+     * @maximum 120
+     */
+  windowSeconds: number;
+  blockLinks: boolean;
+  /**
+     * @maxItems 100
+     * @items.maxLength 253
+     */
+  allowedDomains: string[];
+  /**
+     * @maxItems 100
+     * @items.minLength 1
+     * @items.maxLength 80
+     */
+  words: string[];
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  warnBeforeMute: number;
+  /**
+     * Must exceed warnBeforeMute
+     * @minimum 2
+     * @maximum 30
+     */
+  warnBeforeBan: number;
+  /**
+     * @minimum 1
+     * @maximum 1440
+     */
+  muteMinutes: number;
+  /** @maxLength 2000 */
+  rules: string;
+  /** @maxLength 1000 */
+  welcomeMessage: string;
+}
+
+export type ChatBotActionInputAction = typeof ChatBotActionInputAction[keyof typeof ChatBotActionInputAction];
+
+
+export const ChatBotActionInputAction = {
+  warn: 'warn',
+  mute: 'mute',
+  unmute: 'unmute',
+  ban: 'ban',
+  unban: 'unban',
+  reset: 'reset',
+  delete: 'delete',
+} as const;
+
+export interface ChatBotActionInput {
+  action: ChatBotActionInputAction;
+  /** @minimum 1 */
+  targetUserId?: number;
+  /** @minimum 1 */
+  messageId?: number;
+  /**
+     * @minimum 1
+     * @maximum 1440
+     */
+  durationMinutes?: number;
+  /** @maxLength 500 */
+  reason?: string;
+}
+
+export type ChatBotStateLogsItem = {
+  id: number;
+  action: string;
+  targetUserId: number | null;
+  actorId: number | null;
+  detail: string;
+  createdAt: string;
+};
+
+export type ChatBotStateSanctionsItem = {
+  userId: number;
+  name: string;
+  warnings: number;
+  mutedUntil: string | null;
+  banned: boolean;
+};
+
+export type ChatBotStateMembersItemRole = typeof ChatBotStateMembersItemRole[keyof typeof ChatBotStateMembersItemRole];
+
+
+export const ChatBotStateMembersItemRole = {
+  owner: 'owner',
+  admin: 'admin',
+  member: 'member',
+} as const;
+
+export type ChatBotStateMembersItem = {
+  userId: number;
+  name: string;
+  role: ChatBotStateMembersItemRole;
+};
+
+export interface ChatBotState {
+  settings: ChatBotSettings;
+  logs: ChatBotStateLogsItem[];
+  sanctions: ChatBotStateSanctionsItem[];
+  members: ChatBotStateMembersItem[];
+}
+
 export interface PresenceSessionInput {
   sessionId: string;
   online: boolean;
@@ -589,6 +703,14 @@ export interface AdminStats {
   newUsersToday?: number;
   activeUsers?: number;
 }
+
+export type UpdateChatBot200 = {
+  settings: ChatBotSettings;
+};
+
+export type RunChatBotAction200 = {
+  ok: boolean;
+};
 
 export type GetChatGroupActivity200TypingItem = {
   userId: number;

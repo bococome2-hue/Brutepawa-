@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "../router";
 import PollMessageCard from "../components/PollMessageCard";
+import ChatBotPanel from "../components/ChatBotPanel";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { openImageViewer } from "../components/ImageViewer";
 import { apiFetch, apiGetConversations, apiGetMessages, apiMarkMessagesRead, apiSendMessage, apiGetUsers, apiGetUserPresence, apiGetChatGroups, apiCreateChatGroup, apiGetChatGroupInfo, apiGetChatGroupMessages, apiSendChatGroupMessage, apiLeaveChatGroup, apiUpdateChatGroup, apiSendTyping, apiGetTyping, apiUploadFile, apiUploadFileXHR, apiUploadVoice, apiDeleteConversation, apiDeleteMessage, apiGetLinkPreview, apiGetMessagingSettings, apiUpdateMessagingSettings, apiGetMessageRequests, apiUpdateMessageRequest, apiGetContactInfo, apiMuteContact, apiUnmuteContact, apiPinContact, apiUnpinContact, apiFavoriteContact, apiUnfavoriteContact, apiBlockUser, apiUnblockUser, apiReportUser, apiSendFriendRequest, apiSearchInConversation, apiDeleteConversationContact, apiGetMyGroups, apiAddContactToGroup, apiGetGroupAuditLog, apiKickGroupMember, apiChangeGroupMemberRole, apiGetGroupSettings, apiPatchGroupSettings, apiPatchGroupPermissions, apiPatchGroupReactions, apiSetChatGroupMemberRole, apiRemoveChatGroupMember, apiGetChatGroupMembersGrouped, apiAddChatGroupMembers, apiGetGroupInviteLinks, apiCreateGroupInviteLink, apiRevokeGroupInviteLink, apiUpdateGroupInviteLink, apiGetGroupInviteLinkStats, type PublicUser, type ApiChatGroup, type ApiChatGroupInfo, type LinkPreview, type MessageRequest, type ContactInfo, type GroupAuditEntry, type ApiGroupInviteLink, type ApiGroupInviteLinkStats } from "../lib/api";
@@ -652,6 +653,8 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const [groupInfo, setGroupInfo]           = useState<ApiChatGroupInfo | null>(null);
   const [showGroupInfo, setShowGroupInfo]   = useState(false);
   const [groupNewMsg, setGroupNewMsg]       = useState("");
+  const [showChatBot, setShowChatBot] = useState(false);
+  const [groupSendError, setGroupSendError] = useState<{ groupId: number; message: string } | null>(null);
   const groupActivity = useGroupActivity(activeGroupId, groupNewMsg);
   const [dismissedAddBanner, setDismissedAddBanner]   = useState<Set<number>>(new Set());
   const [dismissedInfoPanel, setDismissedInfoPanel]   = useState<Set<number>>(new Set());
@@ -1914,7 +1917,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
         return next;
       });
     }).catch(() => {});
-    const poll = setInterval(loadMsgs, 15000); /* SSE handles real-time; polling is a fallback */
+    const poll = setInterval(loadMsgs, 3000); /* Refresh bot notices and deleted group messages, including other admins' actions. */
     return () => clearInterval(poll);
   }, [activeGroupId, meId]);
 
@@ -1981,14 +1984,26 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const sendGroupMsg = () => {
     const content = groupNewMsg.trim();
     if (!content || !activeGroupId) return;
+    const groupId = activeGroupId;
+    setGroupSendError(null);
     const now = new Date().toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" });
     const optimistic: GroupMsg = { id: Date.now(), text: content, senderName: "Moi", mine: true, time: now, type: "text" };
     setGroupMsgs(prev => ({ ...prev, [activeGroupId]: [...(prev[activeGroupId] ?? []), optimistic] }));
     setChatGroups(prev => prev.map(g => g.id === activeGroupId ? { ...g, lastMessage: content, lastMessageAt: new Date().toISOString() } : g));
     setGroupNewMsg(""); if (grpInputRef.current) { grpInputRef.current.style.height = "22px"; grpInputRef.current.style.overflowY = "hidden"; }
-    apiSendChatGroupMessage(activeGroupId, content)
-      .then(() => trackEvent("message_sent", { conversation_type: "group", content_type: "text" }))
-      .catch(() => {});
+    apiSendChatGroupMessage(groupId, content)
+      .then(sent => {
+        setGroupMsgs(prev => ({ ...prev, [groupId]: (prev[groupId] ?? []).map(m => m.id !== optimistic.id ? m : {
+          id: sent.id, text: sent.content, senderName: sent.senderName, mine: sent.senderId === meId,
+          time: new Date(sent.createdAt).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" }),
+          type: sent.type,
+        }) }));
+        trackEvent("message_sent", { conversation_type: "group", content_type: "text" });
+      })
+      .catch(error => {
+        setGroupMsgs(prev => ({ ...prev, [groupId]: (prev[groupId] ?? []).filter(m => m.id !== optimistic.id) }));
+        setGroupSendError({ groupId, message: error instanceof Error ? error.message : "Envoi échoué" });
+      });
   };
 
   const createGroup = async () => {
@@ -6262,7 +6277,10 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
                       style={{ padding:"8px 12px 6px", fontSize:14.5, lineHeight:1.45, wordBreak:"break-word",
                         ...(isCurrent ? { outline:"2.5px solid var(--bp-primary)", outlineOffset:"1px" } : isMatch ? { opacity:0.65 } : {}) }}>
                       {msg.text}
-                      <div style={{ fontSize:10, marginTop:2, color:"#888", textAlign:"right" }}>{msg.time}{msg.mine && <span style={{ marginLeft:3, color:"var(--bp-primary)" }}>✓✓</span>}</div>
+                      <div style={{ fontSize:10, marginTop:2, color:"#888", textAlign:"right" }}>
+                        {msg.time}{(grp?.role === "owner" || grp?.role === "admin") && <span style={{marginLeft:6}}>#{msg.id}</span>}
+                        {msg.mine && <span style={{ marginLeft:3, color:"var(--bp-primary)" }}>✓✓</span>}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -6302,6 +6320,9 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
                 PARAMÈTRES
               </button>
               <div style={{ width:1, height:16, background:"rgba(0,0,0,0.12)" }} />
+              <button onClick={() => setShowChatBot(true)} style={{ border:0, background:"none", cursor:"pointer", padding:"8px 4px", color:"var(--bp-primary)", fontSize:12, fontWeight:700 }}>
+                Bot de modération
+              </button>
               <button onClick={() => setShowGrpStats(true)} style={{ background:"none", cursor:"pointer", width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:"50%", border:"1.5px solid var(--bp-primary)" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--bp-primary)" }}><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg>
               </button>
@@ -6310,6 +6331,17 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
         })()}
 
         {/* ══ INPUT BAR — Telegram pill ══ */}
+        {showChatBot && activeGroupId && <ChatBotPanel key={activeGroupId} groupId={activeGroupId} onClose={() => {
+          setShowChatBot(false);
+          refreshGroupInfo();
+          apiGetChatGroupMessages(activeGroupId).then(msgs => setGroupMsgs(prev => ({ ...prev, [activeGroupId]: msgs.map(m => ({
+            id:m.id, text:m.content, senderName:m.senderName, mine:m.senderId===meId,
+            time:new Date(m.createdAt).toLocaleTimeString("fr", {hour:"2-digit",minute:"2-digit"}), type:m.type,
+          })) }))).catch(() => {});
+        }} />}
+        {groupSendError?.groupId === activeGroupId && <div role="alert" style={{ color:"#a61b1b", background:"#fff0ef", padding:"10px 14px", fontSize:13 }}>
+          {groupSendError.message}
+        </div>}
         <div style={{ flexShrink:0, padding:"6px 10px 10px", display:"flex", alignItems:"center", gap:8 }}>
           <div style={{ flex:1, display:"flex", alignItems:"center", background:"#fff", borderRadius:9999, padding:"0 6px 0 14px", minHeight:50, boxShadow:"0 1px 4px rgba(0,0,0,0.12)" }}>
             {/* Emoji */}

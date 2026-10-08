@@ -29,6 +29,66 @@ tags:
     description: Administration
 
 paths:
+  /chat-groups/{id}/bot:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getChatBot
+      tags: [social]
+      summary: Read chat moderation configuration, sanctions and recent history (admins only)
+      responses:
+        "200":
+          description: Moderation state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatBotState" }
+        "403": { description: Not a group administrator }
+    put:
+      operationId: updateChatBot
+      tags: [social]
+      summary: Configure the chat moderation bot (admins only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatBotSettings" }
+      responses:
+        "200":
+          description: Saved configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [settings]
+                properties:
+                  settings: { $ref: "#/components/schemas/ChatBotSettings" }
+        "400": { description: Invalid configuration }
+        "403": { description: Not a group administrator }
+  /chat-groups/{id}/bot/actions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    post:
+      operationId: runChatBotAction
+      tags: [social]
+      summary: Apply or undo a moderation sanction, or delete a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChatBotActionInput" }
+      responses:
+        "200":
+          description: Action completed and recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+        "400": { description: Invalid action }
+        "403": { description: Not an administrator or protected target }
+        "404": { description: Member or message not found }
   /presence/session:
     post:
       operationId: updatePresenceSession
@@ -1004,6 +1064,75 @@ paths:
 
 components:
   schemas:
+    ChatBotSettings:
+      type: object
+      additionalProperties: false
+      required: [enabled, antiSpam, maxMessages, windowSeconds, blockLinks, allowedDomains, words, warnBeforeMute, warnBeforeBan, muteMinutes, rules, welcomeMessage]
+      properties:
+        enabled: { type: boolean }
+        antiSpam: { type: boolean }
+        maxMessages: { type: integer, minimum: 2, maximum: 30 }
+        windowSeconds: { type: integer, minimum: 3, maximum: 120 }
+        blockLinks: { type: boolean }
+        allowedDomains:
+          type: array
+          maxItems: 100
+          items: { type: string, maxLength: 253 }
+        words:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 80 }
+        warnBeforeMute: { type: integer, minimum: 1, maximum: 10 }
+        warnBeforeBan: { type: integer, minimum: 2, maximum: 30, description: Must exceed warnBeforeMute }
+        muteMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        rules: { type: string, maxLength: 2000 }
+        welcomeMessage: { type: string, maxLength: 1000 }
+    ChatBotActionInput:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [warn, mute, unmute, ban, unban, reset, delete] }
+        targetUserId: { type: integer, minimum: 1 }
+        messageId: { type: integer, minimum: 1 }
+        durationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        reason: { type: string, maxLength: 500 }
+    ChatBotState:
+      type: object
+      required: [settings, logs, sanctions, members]
+      properties:
+        settings: { $ref: "#/components/schemas/ChatBotSettings" }
+        logs:
+          type: array
+          items:
+            type: object
+            required: [id, action, targetUserId, actorId, detail, createdAt]
+            properties:
+              id: { type: integer }
+              action: { type: string }
+              targetUserId: { type: integer, nullable: true }
+              actorId: { type: integer, nullable: true }
+              detail: { type: string }
+              createdAt: { type: string, format: date-time }
+        sanctions:
+          type: array
+          items:
+            type: object
+            required: [userId, name, warnings, mutedUntil, banned]
+            properties:
+              userId: { type: integer }
+              name: { type: string }
+              warnings: { type: integer }
+              mutedUntil: { type: string, format: date-time, nullable: true }
+              banned: { type: boolean }
+        members:
+          type: array
+          items:
+            type: object
+            required: [userId, name, role]
+            properties:
+              userId: { type: integer }
+              name: { type: string }
+              role: { type: string, enum: [owner, admin, member] }
     PresenceSessionInput:
       type: object
       required: [sessionId, online]

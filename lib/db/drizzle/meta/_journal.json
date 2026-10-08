@@ -92,6 +92,13 @@
       "when": 1791471713931,
       "tag": "0012_chat_presence_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791475233654,
+      "tag": "0013_chat_group_moderation",
+      "breakpoints": true
     }
   ]
 }

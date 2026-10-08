@@ -7,7 +7,8 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:chat-bot": "esbuild src/lib/chatBotConfig.test.mjs --bundle --platform=node --format=cjs --outfile=../../.local/chat-bot-config.test.cjs && node --test ../../.local/chat-bot-config.test.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1066.0",

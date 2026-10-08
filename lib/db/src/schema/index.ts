@@ -11,3 +11,4 @@ export * from "./storage";
 export * from "./broadcast";
 export * from "./people";
 export * from "./chat-presence";
+export * from "./chat-bots";

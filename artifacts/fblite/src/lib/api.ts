@@ -1118,7 +1118,10 @@ export async function apiSendChatGroupMessage(id: number, content: string): Prom
     method: "POST",
     body: JSON.stringify({ content }),
   });
-  if (!res.ok) throw new Error("Envoi échoué");
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || "Envoi échoué");
+  }
   return res.json() as Promise<ApiChatGroupMessage>;
 }
 
