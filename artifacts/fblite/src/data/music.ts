@@ -8,47 +8,14 @@ export interface Track {
   artworkUrl: string | null;
 }
 
-interface ItunesResult {
-  trackId: number;
-  trackName: string;
-  artistName: string;
-  previewUrl?: string;
-  artworkUrl60?: string;
-  trackTimeMillis?: number;
-  primaryGenreName?: string;
-  kind?: string;
-}
-
-function msToTime(ms?: number): string {
-  if (!ms) return "3:30";
-  const total = Math.round(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function toTrack(r: ItunesResult): Track {
-  return {
-    id: String(r.trackId),
-    title: r.trackName ?? "Unknown",
-    artist: r.artistName ?? "Unknown",
-    duration: msToTime(r.trackTimeMillis),
-    genre: r.primaryGenreName ?? "Afro",
-    previewUrl: r.previewUrl ?? null,
-    artworkUrl: r.artworkUrl60 ?? null,
-  };
-}
-
-export async function searchItunes(term: string, limit = 50): Promise<Track[]> {
-  const url =
-    `https://itunes.apple.com/search?term=${encodeURIComponent(term)}` +
-    `&entity=song&media=music&limit=${limit}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("iTunes API error");
-  const data: { results: ItunesResult[] } = await res.json();
-  return data.results
-    .filter(r => r.kind === "song" && r.trackId)
-    .map(toTrack);
+export async function searchItunes(term: string, limit = 50, signal?: AbortSignal): Promise<Track[]> {
+  const params = new URLSearchParams({ q: term, limit: String(limit) });
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const res = await fetch(`${base}/api/music/search?${params}`, { signal });
+  if (!res.ok) throw new Error("Impossible de charger le catalogue musical.");
+  const data: { tracks: Track[] } = await res.json();
+  if (!Array.isArray(data.tracks)) throw new Error("Réponse du catalogue musical invalide.");
+  return data.tracks;
 }
 
 // Category → iTunes search term

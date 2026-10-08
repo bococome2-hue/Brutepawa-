@@ -5,7 +5,8 @@
  * AfriConnect API - Super-app for West Africa
  * OpenAPI spec version: 0.1.0
  */
+import type { MusicSearchTrack } from './musicSearchTrack';
 
-export interface OrderInput {
-  productId: number;
-}
+export type SearchMusic200 = {
+  tracks: MusicSearchTrack[];
+};

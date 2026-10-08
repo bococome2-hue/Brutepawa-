@@ -29,6 +29,35 @@ tags:
     description: Administration
 
 paths:
+  /music/search:
+    get:
+      operationId: searchMusic
+      tags: [social]
+      summary: Search playable music previews
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 120 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Matching songs with playable previews
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tracks]
+                properties:
+                  tracks:
+                    type: array
+                    items: { $ref: "#/components/schemas/MusicSearchTrack" }
+        "400":
+          description: Invalid search parameters
+        "502":
+          description: Music provider unavailable
   /healthz:
     get:
       operationId: healthCheck
@@ -907,6 +936,17 @@ paths:
 
 components:
   schemas:
+    MusicSearchTrack:
+      type: object
+      required: [id, title, artist, duration, genre, previewUrl, artworkUrl]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        artist: { type: string }
+        duration: { type: string }
+        genre: { type: string }
+        previewUrl: { type: ["string", "null"] }
+        artworkUrl: { type: ["string", "null"] }
     HealthStatus:
       type: object
       required: [status]

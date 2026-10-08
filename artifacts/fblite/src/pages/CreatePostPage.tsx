@@ -171,6 +171,8 @@ export default function CreatePostPage({ onPublish }: Props) {
   const [musicCat, setMusicCat] = useState("all");
   const [musicResults, setMusicResults] = useState<Track[]>([]);
   const [musicLoading, setMusicLoading] = useState(false);
+  const [musicError, setMusicError] = useState(false);
+  const [musicRetry, setMusicRetry] = useState(0);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -240,12 +242,18 @@ export default function CreatePostPage({ onPublish }: Props) {
   useEffect(() => {
     if (!showMusic) return;
     const term = musicQuery.trim() ? musicQuery.trim() : (MUSIC_CATEGORIES.find(c => c.id === musicCat)?.term ?? "afrobeats");
+    const controller = new AbortController();
     setMusicLoading(true);
+    setMusicError(false);
+    setMusicResults([]);
     const timer = setTimeout(() => {
-      searchItunes(term, 100).then(t => { setMusicResults(t); setMusicLoading(false); }).catch(() => setMusicLoading(false));
+      searchItunes(term, 100, controller.signal)
+        .then(t => { if (!controller.signal.aborted) setMusicResults(t); })
+        .catch(() => { if (!controller.signal.aborted) setMusicError(true); })
+        .finally(() => { if (!controller.signal.aborted) setMusicLoading(false); });
     }, musicQuery.trim() ? 400 : 0);
-    return () => clearTimeout(timer);
-  }, [musicQuery, musicCat, showMusic]);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [musicQuery, musicCat, showMusic, musicRetry]);
 
   useEffect(() => { if (!showMusic) { audioRef.current?.pause(); setPlayingId(null); } }, [showMusic]);
   useEffect(() => () => { audioRef.current?.pause(); }, []);
@@ -1389,7 +1397,11 @@ export default function CreatePostPage({ onPublish }: Props) {
               </div>
             ))}
             {!musicLoading && !musicQuery.trim() && musicResults.map(t => <MusicRow key={t.id} track={t} selected={selectedTrack?.id === t.id} playing={playingId === t.id} onSelect={() => { setSelectedTrack(t); setShowMusic(false); audioRef.current?.pause(); setPlayingId(null); }} onPlayPause={() => handlePlayPause(t)} />)}
-            {!musicLoading && musicResults.length === 0 && <div style={{ padding: "32px", textAlign: "center", color: "#64748B" }}>Aucun titre trouvé</div>}
+            {!musicLoading && musicError && <div role="alert" style={{ padding: "32px", textAlign: "center", color: "#64748B" }}>
+              <p>Impossible de charger la musique. Vérifiez votre connexion puis réessayez.</p>
+              <button onClick={() => setMusicRetry(n => n + 1)} style={{ marginTop: 12, padding: "12px 20px", border: "none", borderRadius: 12, background: G, color: "#fff", cursor: "pointer" }}>Réessayer</button>
+            </div>}
+            {!musicLoading && !musicError && musicResults.length === 0 && <div style={{ padding: "32px", textAlign: "center", color: "#64748B" }}>Aucun titre trouvé</div>}
             {selectedTrack && <div onClick={() => { setSelectedTrack(null); setShowMusic(false); }} style={{ padding: "16px 20px", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#EF4444" }}>✕ Supprimer la musique</div>}
           </div>
         </SubPage>

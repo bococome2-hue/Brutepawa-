@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Lesson {
-  id: number;
-  courseId: number;
+export interface MusicSearchTrack {
+  id: string;
   title: string;
+  artist: string;
+  duration: string;
+  genre: string;
   /** @nullable */
-  content?: string | null;
+  previewUrl: string | null;
   /** @nullable */
-  videoUrl?: string | null;
-  duration: number;
-  order: number;
+  artworkUrl: string | null;
 }

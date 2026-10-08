@@ -6,6 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface OrderInput {
-  productId: number;
-}
+export type SearchMusicParams = {
+/**
+ * @minLength 1
+ * @maxLength 120
+ */
+q: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};

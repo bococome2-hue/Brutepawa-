@@ -34,6 +34,7 @@ import preferencesRouter from "./preferences";
 import accountDeletionRouter from "./accountDeletion";
 import giphyRouter from "./giphy";
 import pollsRouter from "./polls";
+import musicRouter from "./music";
 
 const router: IRouter = Router();
 
@@ -72,5 +73,6 @@ router.use(preferencesRouter);
 router.use(accountDeletionRouter);
 router.use(giphyRouter);
 router.use(pollsRouter);
+router.use(musicRouter);
 
 export default router;
