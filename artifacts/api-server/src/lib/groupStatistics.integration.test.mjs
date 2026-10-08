@@ -22,8 +22,8 @@ try {
     }).returning();
     users.push(user);
   }
-  [group] = await db.insert(chatGroupsTable).values({ name: "Vérification statistiques", createdById: users[0].id }).returning();
-  await db.insert(chatGroupMembersTable).values({ groupId: group.id, userId: users[0].id, role: "owner" });
+  [group] = await db.insert(chatGroupsTable).values({ name: "Vérification statistiques", createdById: users[0].id, createdAt: new Date(Date.now() - 100 * 86400000) }).returning();
+  await db.insert(chatGroupMembersTable).values({ groupId: group.id, userId: users[0].id, role: "owner", joinedAt: group.createdAt });
   const contents = ["Bonjour", "https://example.test", "__image__https://example.test/a.jpg", "__audio__https://example.test/a.ogg", "__doc__file.json"];
   const hours = [20, 25, 8 * 24, 31 * 24, 89 * 24];
   await db.insert(chatGroupMessagesTable).values(contents.map((content, i) => ({
@@ -42,7 +42,8 @@ try {
     const types = stats.messageTypes;
     assert.equal(types.total, expected);
     assert.equal(["text", "images", "videos", "voice", "files", "gif", "links", "other"].reduce((n, kind) => n + types[kind], 0), expected);
-    assert.equal(stats.growth, null);
+    assert.deepEqual(stats.growth, [{ day: stats.periodEnd, members: 1 }], "Unknown past days are omitted, not backfilled from today's roster.");
+    assert.match(stats.growthDefinition, /observés/);
     assert.equal(stats.reactionsInPeriod, null);
     console.log(`PASS real persisted API ${period}: ${expected} messages`);
   }
@@ -50,7 +51,18 @@ try {
   assert.equal((await request("period=7d", signToken(users[1].id, "user"))).status, 403);
   assert.equal((await request("start=2026-02-30&end=2026-03-01")).status, 400);
   assert.equal((await request("period=all")).status, 400);
+  await db.insert(chatGroupMembersTable).values({ groupId: group.id, userId: users[1].id, role: "member" });
+  const changedCount = await (await request("period=7d&timezone=Africa%2FPorto-Novo")).json();
+  assert.equal(changedCount.growth.at(-1).members, 2);
+  await db.delete(chatGroupMembersTable).where(eq(chatGroupMembersTable.id, (await db.select().from(chatGroupMembersTable).where(eq(chatGroupMembersTable.userId, users[1].id)))[0].id));
+  assert.equal((await (await request("period=7d&timezone=Africa%2FPorto-Novo")).json()).growth.at(-1).members, 1);
+  await db.update(chatGroupsTable).set({ createdAt: new Date() }).where(eq(chatGroupsTable.id, group.id));
+  const bornToday = await (await request("period=7d&timezone=Africa%2FPorto-Novo")).json();
+  assert.deepEqual(bornToday.growth.map(point => point.members), [0, 0, 0, 0, 0, 0, 1]);
+  await db.update(chatGroupsTable).set({ createdAt: group.createdAt }).where(eq(chatGroupsTable.id, group.id));
+  console.log("PASS actual count changes and zero only before group creation");
   console.log("PASS authentication, membership and range guards");
+  if (!process.env.API_ONLY) {
   browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
   const context = await browser.newContext({ viewport: { width: 500, height: 1080 }, reducedMotion: "reduce" });
   await context.addInitScript(({ token, user }) => {
@@ -74,10 +86,13 @@ try {
     await page.setViewportSize({ width, height: 1080 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   }
+  await page.setViewportSize({ width: 393, height: 874 });
+  await page.screenshot({ path: "../../screenshots/brutepawa-statistics-live-mobile.jpg" });
   await page.getByRole("button", { name: "À propos : Types de messages", exact: true }).click();
   await page.keyboard.press("Escape");
   assert.equal(await page.locator(".bp-detail-sheet").count(), 0);
   console.log("PASS real UI, period changes, responsive overflow and Escape");
+  }
 } finally {
   await browser?.close();
   if (group) {

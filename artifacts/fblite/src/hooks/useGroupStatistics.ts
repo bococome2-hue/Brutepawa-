@@ -25,6 +25,7 @@ export interface GroupStatistics {
   readersInPeriod?: number;
   messageTypes?: { total: number; text: number; images: number; videos: number; voice: number; files: number; gif: number; links: number; other?: number };
   growth?: null | { day: string; members: number }[];
+  growthDefinition?: string;
   joinedInPeriod?: number | null;
   leftInPeriod?: number | null;
   reactionsInPeriod?: number | null;

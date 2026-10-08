@@ -33,8 +33,9 @@ export interface ChatGroupStatistics {
   viewsInPeriod?: number;
   readersInPeriod?: number;
   messageTypes?: ChatGroupStatisticsMessageTypes;
-  /** Null until reliable historical membership tracking is available. */
+  /** Observations réelles par jour, zéro uniquement avant la création du groupe ; jours inconnus omis. */
   growth?: ChatGroupStatisticsGrowthItem[] | null;
+  growthDefinition?: string;
   joinedInPeriod?: number | null;
   leftInPeriod?: number | null;
   reactionsInPeriod?: number | null;

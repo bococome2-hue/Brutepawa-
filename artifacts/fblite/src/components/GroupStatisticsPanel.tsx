@@ -1,18 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import {
-  Activity, ArrowDownRight, ArrowUpRight, BarChart3, CalendarDays, ChevronDown, ChevronLeft,
+  ArrowDownRight, ArrowUpRight, BarChart3, CalendarDays, ChevronDown, ChevronLeft,
   ChevronRight, Clock3, Eye, File, FileText, Film, Image, Info, Link2, MessageCircle,
-  MessageSquare, Mic, MoreVertical, Pencil, Share2, Shield, Sparkles, Users, UserRoundPlus,
-  Video, X, Zap, Heart, type LucideIcon,
+  LogOut, MessageSquare, Mic, MoreVertical, Pencil, Share2, Shield, Sparkles, Users, UserRoundPlus,
+  Video, X, Zap, Heart, TrendingUp, type LucideIcon,
 } from "lucide-react";
 import type { GroupStatistics } from "../hooks/useGroupStatistics";
 import "./GroupStatisticsPanel.css";
 
 type Period = "24h" | "7d" | "30d" | "90d";
 type MessageTypes = Partial<Record<"total" | "text" | "images" | "videos" | "voice" | "files" | "gif" | "links" | "other", number | null>>;
-type GrowthPoint = { day: string; members: number };
-type ExtendedStatistics = GroupStatistics & {
+type GrowthPoint = { day: string; members: number | null };
+type ExtendedStatistics = Omit<GroupStatistics, "growth" | "messageTypes"> & {
   messagesInPeriod?: number | null;
   writersInPeriod?: number | null;
   viewsInPeriod?: number | null;
@@ -46,12 +46,24 @@ interface Props {
 }
 
 const fmtDay = (value?: string) => value
-  ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }).replace(".", "")
+  ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
   : "—";
+const dayStamp = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return match ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : Number.NaN;
+};
+const dateFromStamp = (value: number) => new Date(value).toISOString().slice(0, 10);
+const fmtFullDay = (value: string) => {
+  const stamp = dayStamp(value);
+  return Number.isNaN(stamp) ? "—" : new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(stamp);
+};
 const fmtDate = (value: string, zone?: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", ...(zone ? { timeZone: zone } : {}) }).format(date).replace(".", "");
+  const options = zone ? { timeZone: zone } : {};
+  const day = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", ...options }).format(date);
+  const time = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", ...options }).format(date);
+  return `${day} à ${time}`;
 };
 const number = (value: number | null | undefined) => value == null ? "—" : new Intl.NumberFormat("fr-FR").format(value);
 const periodNames: Record<Period, string> = { "24h": "24 dernières heures", "7d": "7 derniers jours", "30d": "30 derniers jours", "90d": "3 derniers mois" };
@@ -72,58 +84,108 @@ function SectionHeading({ icon: Icon, title, onMore, info = false }: {
   </div>;
 }
 
-function GrowthGraph({ points, onDetail }: { points: GrowthPoint[] | null; onDetail: () => void }) {
-  const drawable = points && points.length > 1;
-  const maxMembers = points?.length ? Math.max(0, ...points.map(point => point.members)) : 0;
-  const chartMax = Math.max(4, Math.ceil(maxMembers / 4) * 4);
-  const coords = useMemo(() => {
-    if (!drawable || !points) return [];
-    return points.map((point, index) => ({
-      x: 14 + index * (370 / (points.length - 1)),
+function GrowthGraph({ points, start, end, onDetail }: {
+  points: GrowthPoint[] | null; start: string; end: string; onDetail: () => void;
+}) {
+  const [activeDay, setActiveDay] = useState<string | null>(null);
+  const startStamp = dayStamp(start);
+  const endStamp = dayStamp(end);
+  const availableStamps = (points ?? []).map(point => dayStamp(point.day)).filter(stamp => !Number.isNaN(stamp));
+  const today = new Date();
+  const todayStamp = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const validStart = Number.isNaN(startStamp) ? Math.min(...availableStamps, todayStamp) : startStamp;
+  const validEnd = Number.isNaN(endStamp) ? Math.max(...availableStamps, validStart) : endStamp;
+  const rangeStart = Math.min(validStart, validEnd);
+  const rangeEnd = Math.max(validStart, validEnd);
+  const rangeDays = Math.max(0, Math.round((rangeEnd - rangeStart) / 86400000));
+  const series = useMemo(() => (points ?? [])
+    .map(point => ({ ...point, stamp: dayStamp(point.day) }))
+    .filter(point => !Number.isNaN(point.stamp) && point.stamp >= rangeStart && point.stamp <= rangeEnd)
+    .sort((a, b) => a.stamp - b.stamp), [points, rangeEnd, rangeStart]);
+  const samples = series.filter((point): point is typeof point & { members: number } => point.members != null && Number.isFinite(point.members));
+  const chartMax = Math.max(4, Math.ceil(Math.max(0, ...samples.map(point => point.members)) / 4) * 4);
+  const coords = useMemo(() => samples.map(point => {
+    const fraction = rangeDays === 0 ? .5 : (point.stamp - rangeStart) / (rangeEnd - rangeStart);
+    return {
+      ...point,
+      x: 14 + fraction * 370,
       y: 86 - (Math.max(0, point.members) / chartMax) * 72,
-    }));
-  }, [chartMax, drawable, points]);
-  const path = useMemo(() => {
-    if (!coords.length) return "";
-    return coords.reduce((line, point, i) => {
-      if (i === 0) return `M ${point.x} ${point.y}`;
-      const previous = coords[i - 1];
+      fraction,
+    };
+  }), [chartMax, rangeDays, rangeEnd, rangeStart, samples]);
+  const segments = useMemo(() => {
+    const result: typeof coords[] = [];
+    let segment: typeof coords = [];
+    series.forEach(point => {
+      const coordinate = coords.find(item => item.day === point.day);
+      if (!coordinate) {
+        if (segment.length) result.push(segment);
+        segment = [];
+        return;
+      }
+      const previous = segment[segment.length - 1];
+      if (previous && coordinate.stamp - previous.stamp > 86400000) {
+        result.push(segment);
+        segment = [];
+      }
+      segment.push(coordinate);
+    });
+    if (segment.length) result.push(segment);
+    return result;
+  }, [coords, series]);
+  const paths = useMemo(() => segments.map(segment => {
+    const line = segment.reduce((value, point, index) => {
+      if (index === 0) return `M ${point.x} ${point.y}`;
+      const previous = segment[index - 1];
       const middle = (previous.x + point.x) / 2;
-      return `${line} C ${middle} ${previous.y}, ${middle} ${point.y}, ${point.x} ${point.y}`;
+      return `${value} C ${middle} ${previous.y}, ${middle} ${point.y}, ${point.x} ${point.y}`;
     }, "");
-  }, [coords]);
-  const labels = points?.map(point => fmtDay(point.day)) ?? [];
+    return { line, area: segment.length > 1 ? `${line} L ${segment[segment.length - 1].x} 86 L ${segment[0].x} 86 Z` : "" };
+  }), [segments]);
+  const tickCount = Math.min(7, rangeDays + 1);
+  const dateTicks = Array.from({ length: tickCount }, (_, index) => {
+    const stamp = tickCount === 1 ? rangeStart + rangeDays * 43200000 : rangeStart + Math.round(rangeDays * index / (tickCount - 1)) * 86400000;
+    const day = dateFromStamp(stamp);
+    const fraction = rangeDays === 0 ? .5 : (stamp - rangeStart) / (rangeEnd - rangeStart);
+    return { day, label: fmtDay(day), x: 14 + fraction * 370 };
+  });
   const ticks = Array.from({ length: 5 }, (_, index) => chartMax * (1 - index / 4));
-  const last = points?.[points.length - 1];
-  return <div className="bp-growth-plot" aria-label={drawable ? "Évolution des membres" : "Historique de croissance non disponible"}>
+  const latest = coords[coords.length - 1];
+  const active = coords.find(point => point.day === activeDay) ?? latest;
+  const seriesKey = `${rangeStart}-${rangeEnd}-${series.map(point => `${point.day}:${point.members ?? "?"}`).join("|")}`;
+  useEffect(() => setActiveDay(null), [seriesKey]);
+  const tooltipStyle: CSSProperties | undefined = active ? {
+    left: `calc(${active.fraction * 100}% + ${14 - active.fraction * 17}px)`,
+    top: `${Math.max(18, 5 + active.y / 96 * 82 - 18)}px`,
+    transform: `translate(${active.fraction <= .2 ? "0" : "-100%"}, -100%)`,
+  } : undefined;
+  return <div className="bp-growth-plot" aria-label={`Évolution des membres du ${fmtFullDay(start)} au ${fmtFullDay(end)}`}>
     <div className="bp-chart-ylabels" aria-hidden="true">{ticks.map((tick, index) => <span key={index}>{number(tick)}</span>)}</div>
-    {drawable ? <svg className="bp-chart-svg" viewBox="0 0 398 96" preserveAspectRatio="none" role="img" aria-label="Courbe de croissance des membres">
+    <svg className="bp-chart-svg" viewBox="0 0 398 96" preserveAspectRatio="none" role="img" aria-label={`Courbe de croissance, ${coords.length} relevé${coords.length === 1 ? "" : "s"}`}>
       <defs><linearGradient id="bp-growth-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#22c55e" stopOpacity=".22" /><stop offset="100%" stopColor="#22c55e" stopOpacity=".025" /></linearGradient></defs>
       {[14, 32, 50, 68, 86].map(y => <line key={y} x1="14" y1={y} x2="384" y2={y} className="bp-chart-grid" />)}
+      {dateTicks.map(tick => <line key={`x-${tick.day}`} x1={tick.x} y1="14" x2={tick.x} y2="86" className="bp-chart-date-grid" />)}
       <line x1="14" y1="86" x2="384" y2="86" className="bp-chart-axis" />
-      <line x1="14" y1="12" x2="14" y2="86" className="bp-chart-axis" />
-      <path d={`${path} L 384 86 L 14 86 Z`} fill="url(#bp-growth-fill)" />
-      <path d={path} className="bp-chart-line" />
-      {coords.map((point, index) => <circle key={`${points?.[index]?.day}-${index}`} cx={point.x} cy={point.y} r="3.2" className="bp-chart-dot" />)}
-    </svg> : <div className="bp-chart-untracked">
-      <span className="bp-empty-chart-mark"><BarChart3 size={18} /></span>
-      <span>Historique des membres non suivi</span>
-      <span className="bp-empty-chart-detail">La courbe apparaîtra lorsque ces données seront disponibles.</span>
-    </div>}
-    {drawable && <div className="bp-chart-xlabels" aria-hidden="true">{labels.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div>}
-    {drawable && last && <div className="bp-chart-tooltip"><strong>{number(last.members)} membres</strong><span><i /> {fmtDay(last.day)}</span></div>}
-    {!drawable && <button className="bp-chart-detail-hit" type="button" aria-label="Détails de la croissance" onClick={onDetail} />}
+      <line x1="14" y1="14" x2="14" y2="86" className="bp-chart-axis" />
+      {paths.map((path, index) => path.area && <path key={`area-${index}`} d={path.area} className="bp-chart-area" fill="url(#bp-growth-fill)" />)}
+      {paths.map((path, index) => <path key={`line-${index}`} d={path.line} className="bp-chart-line" pathLength="1" />)}
+      {coords.map(point => <circle key={`${point.day}-${point.stamp}`} cx={point.x} cy={point.y} r="3.2" className={`bp-chart-dot ${active?.day === point.day ? "is-active" : ""}`} tabIndex={0} role="button"
+        aria-label={`${number(point.members)} membres, ${fmtFullDay(point.day)}`} onPointerEnter={() => setActiveDay(point.day)}
+        onFocus={() => setActiveDay(point.day)} onClick={() => setActiveDay(point.day)} />)}
+    </svg>
+    <div className="bp-chart-xlabels" aria-hidden="true">{dateTicks.map(tick => <span key={tick.day} style={{ left: `${tick.x / 398 * 100}%` }}>{tick.label}</span>)}</div>
+    {active && <div className="bp-chart-tooltip" style={tooltipStyle} aria-live="polite"><strong>{number(active.members)} membres</strong><span><i /> {fmtFullDay(active.day)}</span></div>}
+    {!coords.length && <button className="bp-chart-detail-hit" type="button" aria-label="Détails de la croissance" onClick={onDetail} />}
   </div>;
 }
 
 function MetricTile({ icon: Icon, label, value, active = false, color = "green", onClick }: {
   icon: LucideIcon; label: string; value: number | null | undefined; active?: boolean; color?: string; onClick?: () => void;
 }) {
-  const Tag = onClick ? "button" : "div";
-  return <Tag type={onClick ? "button" : undefined} onClick={onClick} className={`bp-type-tile ${active ? "is-active" : ""} tone-${color}`}>
+  return <button type="button" onClick={onClick} className={`bp-type-tile ${active ? "is-active" : ""} tone-${color}`}>
     <Icon size={16} strokeWidth={2} />
     <strong>{number(value)}</strong><span>{label}</span>
-  </Tag>;
+  </button>;
 }
 
 export default function GroupStatisticsPanel({
@@ -138,6 +200,30 @@ export default function GroupStatisticsPanel({
   const [detail, setDetail] = useState<Detail | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
+  const [surface, setSurface] = useState(() => {
+    if (typeof window === "undefined") return { scale: 1, height: 1080 };
+    const width = window.visualViewport?.width ?? document.documentElement.clientWidth ?? window.innerWidth;
+    const scale = Math.min(1, width / 500);
+    return { scale, height: window.innerHeight / scale };
+  });
+  useEffect(() => {
+    const measureSurface = () => {
+      const root = screenRef.current;
+      const styles = root ? window.getComputedStyle(root) : null;
+      const safeTop = Number.parseFloat(styles?.paddingTop ?? "0") || 0;
+      const safeBottom = Number.parseFloat(styles?.paddingBottom ?? "0") || 0;
+      const width = window.visualViewport?.width ?? document.documentElement.clientWidth ?? window.innerWidth;
+      const scale = Math.min(1, width / 500);
+      setSurface({ scale, height: Math.max(0, window.innerHeight - safeTop - safeBottom) / scale });
+    };
+    measureSurface();
+    window.addEventListener("resize", measureSurface);
+    window.visualViewport?.addEventListener("resize", measureSurface);
+    return () => {
+      window.removeEventListener("resize", measureSurface);
+      window.visualViewport?.removeEventListener("resize", measureSurface);
+    };
+  }, []);
   useEffect(() => {
     const root = screenRef.current;
     if (!root) return;
@@ -187,7 +273,7 @@ export default function GroupStatisticsPanel({
   const onTab = (name: string) => {
     setTab(name);
     if (name === "Membres") onMembers ? onMembers() : showDetail("Membres", "Liste des membres du groupe.", detailRows([["Membres", stats?.membersTotal]]));
-    else if (name === "Médias") onMedia ? onMedia() : showDetail("Médias", "Répartition des médias partagés sur cette période.", detailRows([
+    else if (name === "Médias") onMedia ? onMedia() : showDetail("Médias", `Répartition des médias et autres types partagés sur ${periodDescription}.`, detailRows([
       ["Images", typeCounts?.images], ["Vidéos", typeCounts?.videos], ["Vocaux", typeCounts?.voice],
       ["Fichiers", typeCounts?.files], ["GIF", typeCounts?.gif], ["Liens", typeCounts?.links], ["Autres", typeCounts?.other],
     ]));
@@ -207,8 +293,11 @@ export default function GroupStatisticsPanel({
   }, []);
   const sparkViews = cumulativeViews.slice(-4);
   const sparkMax = Math.max(1, ...sparkViews);
-  const trend = (key: string) => stats?.trends?.[key] == null ? "—"
-    : `${stats.trends[key]! >= 0 ? "+" : ""}${number(stats.trends[key])}%`;
+  const trendValue = (key: string) => stats?.trends?.[key];
+  const trend = (key: string) => trendValue(key) == null ? "—"
+    : `${trendValue(key)! >= 0 ? "+" : ""}${number(trendValue(key))}%`;
+  const trendBadge = (key: string) => trendValue(key) == null ? <small>—</small>
+    : <small>{trendValue(key)! < 0 ? <ArrowDownRight size={8} strokeWidth={2.5} /> : <ArrowUpRight size={8} strokeWidth={2.5} />}{trend(key)}</small>;
   const today = new Intl.DateTimeFormat("sv-SE", { timeZone: stats?.timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const chosenStart = startDate || data?.periodStart || "";
   const chosenEnd = endDate || data?.periodEnd || "";
@@ -224,6 +313,7 @@ export default function GroupStatisticsPanel({
 
   return createPortal(
     <div ref={screenRef} tabIndex={-1} className={`bp-stats-screen ${showDemoStatus ? "bp-demo-screen" : ""}`} role="dialog" aria-modal="true" aria-label={`Statistiques de ${title}`}>
+      <div className="bp-design-surface" style={{ height: `${surface.height}px`, transform: `scale(${surface.scale})` }}>
       {showDemoStatus && <div className="bp-status-bar" aria-label="Barre d’état"><strong>18:14</strong><span className="bp-status-right"><i className="bp-cell-signal"><b /><b /><b /><b /></i><i className="bp-wifi-mark" /><i className="bp-battery">88</i></span></div>}
       <header className="bp-app-header">
         <button className="bp-header-icon bp-back" onClick={onClose} type="button" aria-label="Retour"><ChevronLeft size={22} /></button>
@@ -282,14 +372,14 @@ export default function GroupStatisticsPanel({
               {overviewMetrics.map(({ icon: Icon, label, value }, index) => <button className="bp-overview-metric" key={label} type="button" onClick={() => label === "Membres" ? (onMembers ? onMembers() : showDetail("Membres", "Membres actuels du groupe.", detailRows([[label, value]]))) : showDetail(label, `${label} sur ${periodDescription}.`, detailRows([[label, value]]))}>
                 <Icon className="bp-metric-icon" size={20} strokeWidth={2.3} />
                 <strong>{number(value)}</strong><span>{label}</span>
-                <small aria-label="Variation sur la période">{trend(["members", "messages", "readers", "writers"][index])}</small>
+                {trendBadge(["members", "messages", "readers", "writers"][index])}
               </button>)}
             </div>
           </section>
 
           <section className="bp-section-card bp-growth-card">
-            <SectionHeading icon={Activity} title="Croissance du groupe" info onMore={() => showDetail("Croissance du groupe", growth?.length ? "Évolution réelle du nombre de membres." : "Les données historiques de croissance ne sont pas suivies.", growth?.map(point => ({ label: fmtDay(point.day), value: number(point.members) })))} />
-            <GrowthGraph points={growth} onDetail={() => showDetail("Croissance du groupe", "Les données historiques de croissance ne sont pas suivies.")} />
+            <SectionHeading icon={TrendingUp} title="Croissance du groupe" info onMore={() => showDetail("Croissance du groupe", stats?.growthDefinition ?? "", growth?.map(point => ({ label: fmtFullDay(point.day), value: number(point.members) })))} />
+            <GrowthGraph points={growth} start={stats?.periodStart ?? ""} end={stats?.periodEnd ?? ""} onDetail={() => showDetail("Croissance du groupe", stats?.growthDefinition ?? "")} />
           </section>
 
           <section className="bp-member-cards">
@@ -297,16 +387,18 @@ export default function GroupStatisticsPanel({
               <span className="bp-member-icon join"><UserRoundPlus size={19} /></span>
               <span className="bp-member-card-main"><span className="bp-member-card-title">Nouveaux membres</span><strong>{number(joinValue)}</strong></span>
               <span className="bp-mini-more">Voir plus <ChevronRight size={13} /></span>
+              {demoMode && <span className="bp-member-spark bars-joined" aria-hidden="true">{[7, 10, 6, 9, 13, 8, 11, 16, 12, 9, 14, 8, 12, 6, 11, 15, 9, 13, 7, 10, 16, 12].map((height, index) => <i key={index} style={{ height }} />)}</span>}
             </button>
             <button className="bp-member-card" type="button" onClick={() => showDetail("Membres partis", leaveValue == null ? "Aucune donnée des départs n’est disponible pour cette période." : `${number(leaveValue)} membres partis sur ${periodDescription}.`, detailRows([["Membres partis", leaveValue]]))}>
-              <span className="bp-member-icon leave"><ArrowDownRight size={19} /></span>
+              <span className="bp-member-icon leave"><LogOut size={19} /></span>
               <span className="bp-member-card-main"><span className="bp-member-card-title">Membres partis</span><strong>{number(leaveValue)}</strong></span>
               <span className="bp-mini-more">Voir plus <ChevronRight size={13} /></span>
+              {demoMode && <span className="bp-member-spark bars-left" aria-hidden="true">{[5, 9, 4, 7, 3, 5, 2, 4, 3, 6, 2, 5, 8, 3, 6, 2, 4, 7, 3, 5, 2, 6].map((height, index) => <i key={index} style={{ height }} />)}</span>}
             </button>
           </section>
 
           <section className="bp-section-card bp-engagement-card">
-            <SectionHeading icon={Sparkles} title="Consultations et réactions" info onMore={() => showDetail("Consultations et réactions", "Les consultations sont calculées selon la définition fournie par le groupe.", detailRows([["Vues", views], ["Réactions", stats?.reactionsInPeriod ?? stats?.reactionsLast7Days], ["Réponses", stats?.repliesInPeriod], ["Partages", stats?.sharesInPeriod]]))} />
+            <SectionHeading icon={Sparkles} title="Consultations et réactions" info onMore={() => showDetail("Consultations et réactions", stats?.viewDefinition ?? "Les consultations et interactions sont comptées sur la période choisie.", detailRows([["Vues", views], ["Réactions", stats?.reactionsInPeriod ?? stats?.reactionsLast7Days], ["Réponses", stats?.repliesInPeriod], ["Partages", stats?.sharesInPeriod]]))} />
             <div className="bp-engagement-grid">
               {[
                 { label: "Vues", value: views, icon: Eye, tone: "green", activity: true },
@@ -315,11 +407,9 @@ export default function GroupStatisticsPanel({
                 { label: "Partages", value: stats?.sharesInPeriod, icon: Share2, tone: "green" },
               ].map(({ label, value, icon: Icon, tone, activity }) => <div className={`bp-engagement-cell tone-${tone}`} key={label}>
                 <div className="bp-engagement-value"><Icon size={19} strokeWidth={2.2} /><strong>{number(value)}</strong>{activity && value != null && <span className="bp-spark-bars" aria-label="Vues cumulées par jour">{sparkViews.map((views, index) => <i key={index} style={{ height: `${views / sparkMax * 18}px` }} />)}</span>}</div>
-                <span>{label}</span>{label === "Vues" && <small>{periodDescription}</small>}
-                {(label === "Réactions" || label === "Réponses" || label === "Partages") && value == null && <small>Non suivies</small>}
+                <span>{label}</span>{label === "Vues" ? <small>{periodDescription}</small> : trendBadge(label === "Réactions" ? "reactions" : label === "Réponses" ? "replies" : "shares")}
               </div>)}
             </div>
-            {stats?.viewDefinition && <p className="bp-view-definition">{stats.viewDefinition}</p>}
           </section>
 
           <section className="bp-section-card bp-message-types-card">
@@ -327,14 +417,17 @@ export default function GroupStatisticsPanel({
               ...[["Total", typeCounts?.total], ["Texte", typeCounts?.text], ["Images", typeCounts?.images], ["Vidéos", typeCounts?.videos], ["Vocaux", typeCounts?.voice], ["Fichiers", typeCounts?.files], ["GIF", typeCounts?.gif], ["Liens", typeCounts?.links], ["Autres", typeCounts?.other]].map(([label, value]) => ({ label: String(label), value: number(value as number | null | undefined) })),
             ])} />
             <div className="bp-types-grid">
-              <MetricTile icon={BarChart3} label="Total" value={typeCounts?.total} active />
-              <MetricTile icon={FileText} label="Texte" value={typeCounts?.text} color="slate" />
-              <MetricTile icon={Image} label="Images" value={typeCounts?.images} color="mint" />
-              <MetricTile icon={Video} label="Vidéos" value={typeCounts?.videos} color="violet" />
-              <MetricTile icon={Mic} label="Vocaux" value={typeCounts?.voice} color="blue" />
-              <MetricTile icon={File} label="Fichiers" value={typeCounts?.files} color="amber" />
-              <MetricTile icon={Film} label="GIF" value={typeCounts?.gif} color="pink" />
-              <MetricTile icon={Link2} label="Liens" value={typeCounts?.links} color="gray" />
+              {[
+                { icon: BarChart3, label: "Total", value: typeCounts?.total, color: "green" },
+                { icon: FileText, label: "Texte", value: typeCounts?.text, color: "slate" },
+                { icon: Image, label: "Images", value: typeCounts?.images, color: "mint" },
+                { icon: Video, label: "Vidéos", value: typeCounts?.videos, color: "violet" },
+                { icon: Mic, label: "Vocaux", value: typeCounts?.voice, color: "blue" },
+                { icon: File, label: "Fichiers", value: typeCounts?.files, color: "amber" },
+                { icon: Film, label: "GIF", value: typeCounts?.gif, color: "pink" },
+                { icon: Link2, label: "Liens", value: typeCounts?.links, color: "gray" },
+              ].map(({ icon, label, value, color }, index) => <MetricTile key={label} icon={icon} label={label} value={value} color={color} active={!index}
+                onClick={() => showDetail(label, `${label} sur ${periodDescription}.`, [{ label, value: number(value) }])} />)}
             </div>
           </section>
 
@@ -347,12 +440,11 @@ export default function GroupStatisticsPanel({
               <button className="bp-row-menu" type="button" aria-label={`Détails de l’activité de ${activity.name}`} onClick={() => showDetail(activity.name, activity.type === "system" ? "Message système" : "Message envoyé", [{ label: "Date", value: fmtDate(activity.createdAt, stats?.timeZone) }])}><MoreVertical size={15} /></button>
             </div>)}</div> : <div className="bp-activity-empty"><MessageCircle size={18} /><span>Aucune activité enregistrée.</span></div>}
           </section>
-          <footer className="bp-demo-caption">{demoMode ? "Démonstration · données fictives pour la comparaison visuelle" : null}</footer>
         </>}
 
         {tab === "Boosts" && <section className="bp-section-card bp-unavailable-card"><Zap size={24} /><strong>Boosts indisponibles</strong><span>Les boosts ne sont pas encore disponibles pour ce groupe.</span></section>}
       </main>
-
+      </div>
       {(menuOpen || detail) && <div className="bp-sheet-backdrop" role="presentation" onClick={() => { setMenuOpen(false); setDetail(null); }}>
         <section className="bp-detail-sheet" role="dialog" aria-modal="true" aria-label={detail?.title ?? "Menu du groupe"} onClick={event => event.stopPropagation()}>
           <div className="bp-sheet-grabber" />

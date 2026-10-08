@@ -1209,15 +1209,16 @@ components:
             links: { type: integer }
             other: { type: integer }
         growth:
+          description: Observations réelles par jour, zéro uniquement avant la création du groupe ; jours inconnus omis.
           type: array
           nullable: true
-          description: Null until reliable historical membership tracking is available.
           items:
             type: object
             required: [day, members]
             properties:
               day: { type: string, format: date }
               members: { type: integer }
+        growthDefinition: { type: string }
         joinedInPeriod: { type: integer, nullable: true }
         leftInPeriod: { type: integer, nullable: true }
         reactionsInPeriod: { type: integer, nullable: true }

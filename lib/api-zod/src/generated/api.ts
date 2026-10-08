@@ -524,7 +524,8 @@ export const GetChatGroupStatisticsResponse = zod.object({
   "growth": zod.array(zod.object({
   "day": zod.date(),
   "members": zod.number()
-})).nullish().describe('Null until reliable historical membership tracking is available.'),
+})).nullish().describe('Observations réelles par jour, zéro uniquement avant la création du groupe ; jours inconnus omis.'),
+  "growthDefinition": zod.string().optional(),
   "joinedInPeriod": zod.number().nullish(),
   "leftInPeriod": zod.number().nullish(),
   "reactionsInPeriod": zod.number().nullish(),

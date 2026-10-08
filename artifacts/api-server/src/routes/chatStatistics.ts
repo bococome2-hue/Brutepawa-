@@ -36,6 +36,16 @@ router.get("/chat-groups/:id/statistics", async (req, res): Promise<void> => {
   try { range = statisticsRange(req.query); }
   catch { res.status(400).json({ error: "Période ou fuseau horaire invalide (93 jours maximum)." }); return; }
   const timeZone = range.timezone;
+  // Observation only: no fake backfill, no change to membership or view counters.
+  // The hourly key bounds polling writes; unchanged samples are not rewritten.
+  await db.execute(sql`
+    INSERT INTO chat_group_growth_samples (group_id, sample_hour, observed_at, members)
+    SELECT ${groupId}, date_trunc('hour', now(), 'UTC'), now(), count(*)::int
+    FROM chat_group_members WHERE group_id = ${groupId}
+    ON CONFLICT (group_id, sample_hour) DO UPDATE
+      SET observed_at = EXCLUDED.observed_at, members = EXCLUDED.members
+      WHERE chat_group_growth_samples.members <> EXCLUDED.members
+  `);
   const result = await db.transaction(async (transaction) => {
   // Local calendar bounds; the 24h preset is genuinely rolling. All timestamps are parameterized.
   const bounds = sql`WITH bounds AS (
@@ -118,10 +128,28 @@ router.get("/chat-groups/:id/statistics", async (req, res): Promise<void> => {
       count(*) FILTER (WHERE kind = 'gif')::int AS gif,
       count(*) FILTER (WHERE kind = 'links')::int AS links,
       count(*) FILTER (WHERE kind = 'other')::int AS other FROM classified`);
+  const growth = await transaction.execute(sql`${bounds}, sampled_points AS (
+    SELECT date_trunc('day', timezone(${timeZone}, s.observed_at)) AS day,
+      s.members, s.observed_at
+    FROM chat_group_growth_samples s CROSS JOIN period w
+    WHERE s.group_id = ${groupId} AND s.observed_at >= w.start_at AND s.observed_at <= w.end_at
+  ), sampled_days AS (
+    SELECT DISTINCT ON (day) day, members FROM sampled_points ORDER BY day, observed_at DESC
+  )
+    SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+      CASE WHEN d.day < date_trunc('day', timezone(${timeZone}, g.created_at))
+        THEN 0 ELSE s.members END AS members
+    FROM period w CROSS JOIN LATERAL
+      generate_series(w.start_day, w.end_day, interval '1 day') d(day)
+      JOIN chat_groups g ON g.id = ${groupId} LEFT JOIN sampled_days s ON s.day = d.day
+    WHERE s.members IS NOT NULL OR d.day < date_trunc('day', timezone(${timeZone}, g.created_at))
+    ORDER BY d.day
+  `);
   return {
     groupId, timeZone, ...metrics.rows[0], reactionsLast7Days: null,
     period: range.period, customRange: range.custom, messageTypes: types.rows[0],
-    growth: null, joinedInPeriod: null, leftInPeriod: null, trends: null,
+    growth: growth.rows, joinedInPeriod: null, leftInPeriod: null, trends: null,
+    growthDefinition: "Effectifs réellement observés, conservés par heure puis affichés par jour. Les jours avant la création du groupe valent zéro. Les jours sans observation après sa création restent inconnus : ils ne sont pas reconstruits à partir des membres actuels.",
     reactionsInPeriod: null, repliesInPeriod: null, sharesInPeriod: null,
     daily: daily.rows, recentActivity: recent.rows,
     viewDefinition: "Une vue correspond à une ouverture réelle du groupe. Les nouvelles tentatives de la même ouverture ne sont pas recomptées. L’ancien historique des vues n’est pas disponible.",
