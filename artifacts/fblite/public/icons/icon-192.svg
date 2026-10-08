@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" fill="transparent"/>
+  <rect width="192" height="192" rx="42" ry="42" fill="#22C55E"/>
+  <text x="96" y="140" font-family="Arial Black,Arial,sans-serif" font-weight="900"
+    font-size="138" fill="white" text-anchor="middle" dominant-baseline="auto"
+    letter-spacing="-4">b</text>
+  <circle cx="130" cy="142" r="10" fill="rgba(2,21,13,0.4)"/>
+</svg>

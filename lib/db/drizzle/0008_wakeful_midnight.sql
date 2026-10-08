@@ -1,0 +1,1 @@
+ALTER TABLE "messages" ADD CONSTRAINT "messages_poll_id_fk" FOREIGN KEY ("poll_id") REFERENCES "public"."polls"("id") ON DELETE no action ON UPDATE no action;

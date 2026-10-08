@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- Transparent background — Android tints this white in the status bar -->
+  <g fill="white">
+    <!-- Letter "b" shape matching BrutePawa identity -->
+    <text x="48" y="72" font-family="Arial Black,Arial,sans-serif" font-weight="900"
+      font-size="78" fill="white" text-anchor="middle" dominant-baseline="auto"
+      letter-spacing="-2">b</text>
+    <!-- Small dot below (chat bubble hint) -->
+    <circle cx="62" cy="74" r="5" fill="white"/>
+  </g>
+</svg>

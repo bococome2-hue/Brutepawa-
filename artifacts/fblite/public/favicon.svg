@@ -1,0 +1,17 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="180" y2="180" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="40" fill="url(#bg)"/>
+  <!-- "b" letter -->
+  <text x="28" y="130" font-size="110" font-weight="800" font-family="Georgia, serif" fill="white">b</text>
+  <!-- chat bubble inside the "b" circle -->
+  <circle cx="118" cy="108" r="32" fill="white" fill-opacity="0.92"/>
+  <circle cx="108" cy="108" r="5.5" fill="#16a34a"/>
+  <circle cx="118" cy="108" r="5.5" fill="#16a34a"/>
+  <circle cx="128" cy="108" r="5.5" fill="#16a34a"/>
+  <path d="M118 140 L108 128 H128 Z" fill="white" fill-opacity="0.92"/>
+</svg>

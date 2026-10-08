@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Full bleed green for maskable -->
+  <rect width="512" height="512" fill="#22C55E"/>
+  <text x="256" y="356" font-family="Arial Black,Arial,sans-serif" font-weight="900"
+    font-size="318" fill="white" text-anchor="middle" dominant-baseline="auto"
+    letter-spacing="-8">b</text>
+  <circle cx="332" cy="360" r="23" fill="rgba(2,21,13,0.35)"/>
+</svg>

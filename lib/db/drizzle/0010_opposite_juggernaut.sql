@@ -1,0 +1,1 @@
+ALTER TABLE "poll_votes" ALTER COLUMN "id" SET DATA TYPE bigint;

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/creator-pro/"
+title = "BrutePawa Creator Pro"
+version = "1.0.0"
+id = "artifacts/creator-pro"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/creator-pro/" ]
+localPort = 19530
+
+[services.development]
+run = "pnpm --filter @workspace/creator-pro run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/creator-pro", "run", "build" ]
+publicDir = "artifacts/creator-pro/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19530"
+BASE_PATH = "/creator-pro/"

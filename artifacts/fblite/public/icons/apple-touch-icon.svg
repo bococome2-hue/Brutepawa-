@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <rect width="180" height="180" fill="#1877F2"/>
+  <circle cx="90" cy="90" r="63" fill="#1877F2"/>
+  <text x="90" y="90" font-family="Arial,sans-serif" font-weight="900" font-size="52"
+    fill="white" text-anchor="middle" dominant-baseline="central">BP</text>
+</svg>

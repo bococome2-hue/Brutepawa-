@@ -1,0 +1,67 @@
+modules = ["nodejs-20", "web", "python-3.11", "postgresql-16"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+integrations = ["github:1.0.0"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 90000
+
+[[ports]]
+localPort = 3000
+externalPort = 4200
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 80
+
+[[ports]]
+localPort = 8082
+externalPort = 3002
+
+[[ports]]
+localPort = 19530
+externalPort = 5000
+
+[[ports]]
+localPort = 22245
+externalPort = 3003
+
+[[ports]]
+localPort = 22853
+externalPort = 3001
+
+[[ports]]
+localPort = 24265
+externalPort = 3000
+
+[nix]
+channel = "stable-25_05"
+packages = ["glib", "nss", "nspr", "atk", "at-spi2-atk", "cups", "dbus", "expat", "libdrm", "mesa", "pango", "cairo", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libxcb", "libxkbcommon", "alsa-lib", "libgbm"]
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BPxZPxSeN1gfVwAO14Y0M8vd48FkLal9o5_dQXtff9F6a_cEnxxGTARm4k9t-d0x_QB29JzcdWg71MJODHOZvlQ"
+CF_ACCOUNT_ID = "09e1ef3aa248da4402f2dd80e146d674"
+R2_BUCKET_NAME = "brutepawa"
+R2_PUBLIC_URL = "https://pub-e3ba82fe52b2441d8e517d67591e7115.r2.dev"
+VAPID_PRIVATE_KEY = "1lPWziwtkR9V-zGIzEO835i_0x2b0vB0pDgw-Bc7_i4"
+DB_PROVIDER = "replit"

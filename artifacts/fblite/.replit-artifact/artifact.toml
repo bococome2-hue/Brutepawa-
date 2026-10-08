@@ -1,0 +1,49 @@
+kind = "web"
+previewPath = "/"
+title = "Brute Pawa"
+version = "1.0.0"
+id = "artifacts/fblite"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = ["/"]
+localPort = 3000
+
+[services.development]
+run = "pnpm --filter @workspace/fblite run dev"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/fblite", "run", "build"]
+publicDir = "artifacts/fblite/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "3000"
+BASE_PATH = "/"
+
+[[services]]
+name = "api-server"
+paths = ["/api"]
+localPort = 8080
+
+[services.development]
+run = "pnpm --filter @workspace/api-server run dev"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/api-server", "run", "build"]
+run = ["pnpm", "--filter", "@workspace/api-server", "run", "start"]
+
+[services.production.health.startup]
+path = "/api/healthz"
+
+[services.env]
+PORT = "8080"

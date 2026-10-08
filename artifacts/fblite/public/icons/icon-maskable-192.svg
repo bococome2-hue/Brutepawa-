@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Full bleed green background for maskable icon -->
+  <rect width="192" height="192" fill="#22C55E"/>
+  <!-- "b" centered in safe zone (inner 75%) -->
+  <text x="96" y="140" font-family="Arial Black,Arial,sans-serif" font-weight="900"
+    font-size="120" fill="white" text-anchor="middle" dominant-baseline="auto"
+    letter-spacing="-3">b</text>
+  <circle cx="126" cy="142" r="9" fill="rgba(2,21,13,0.35)"/>
+</svg>

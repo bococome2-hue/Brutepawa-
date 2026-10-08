@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781548097339,
+      "tag": "0000_broken_dazzler",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781591826920,
+      "tag": "0001_add_music_to_posts",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781783035568,
+      "tag": "0002_parched_namora",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786981487737,
+      "tag": "0003_thick_luminals",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1755475200000,
+      "tag": "0004_audit_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786981766982,
+      "tag": "0005_group_management",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786988777612,
+      "tag": "0006_uneven_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788975964544,
+      "tag": "0007_bent_black_bird",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788976011718,
+      "tag": "0008_wakeful_midnight",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788976624478,
+      "tag": "0009_hesitant_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788977971303,
+      "tag": "0010_opposite_juggernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789011638031,
+      "tag": "0011_opposite_professor_monster",
+      "breakpoints": true
+    }
+  ]
+}

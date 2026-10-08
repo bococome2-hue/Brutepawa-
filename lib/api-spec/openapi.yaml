@@ -1,0 +1,1357 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: AfriConnect API - Super-app for West Africa
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: wallet
+    description: Wallet and payments
+  - name: tontines
+    description: Tontine groups and savings
+  - name: marketplace
+    description: Regional marketplace
+  - name: jobs
+    description: Employment and freelance
+  - name: education
+    description: Online courses and exams
+  - name: social
+    description: Professional network
+  - name: admin
+    description: Administration
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── AUTH ──────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  # ── USERS ─────────────────────────────────────────────────────────
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateMe
+      tags: [users]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ── WALLET ────────────────────────────────────────────────────────
+  /wallet:
+    get:
+      operationId: getWallet
+      tags: [wallet]
+      summary: Get current user wallet
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+
+  /wallet/transactions:
+    get:
+      operationId: listTransactions
+      tags: [wallet]
+      summary: List wallet transactions
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /wallet/transfer:
+    post:
+      operationId: transfer
+      tags: [wallet]
+      summary: Transfer money to another user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /wallet/deposit:
+    post:
+      operationId: deposit
+      tags: [wallet]
+      summary: Deposit via Mobile Money
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /wallet/stats:
+    get:
+      operationId: getWalletStats
+      tags: [wallet]
+      summary: Wallet stats summary (income, expenses, balance)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletStats"
+
+  # ── TONTINES ──────────────────────────────────────────────────────
+  /tontines:
+    get:
+      operationId: listTontines
+      tags: [tontines]
+      summary: List tontine groups for current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tontine"
+    post:
+      operationId: createTontine
+      tags: [tontines]
+      summary: Create a tontine group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TontineInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tontine"
+
+  /tontines/{id}:
+    get:
+      operationId: getTontine
+      tags: [tontines]
+      summary: Get tontine details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TontineDetail"
+
+  /tontines/{id}/contribute:
+    post:
+      operationId: contribute
+      tags: [tontines]
+      summary: Make a tontine contribution
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContributionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contribution"
+
+  /tontines/{id}/members:
+    post:
+      operationId: joinTontine
+      tags: [tontines]
+      summary: Join a tontine group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinTontineInput"
+      responses:
+        "201":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TontineMember"
+
+  # ── MARKETPLACE ──────────────────────────────────────────────────
+  /products:
+    get:
+      operationId: listProducts
+      tags: [marketplace]
+      summary: List marketplace products
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [marketplace]
+      summary: Create a product listing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [marketplace]
+      summary: Get product details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    patch:
+      operationId: updateProduct
+      tags: [marketplace]
+      summary: Update product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    delete:
+      operationId: deleteProduct
+      tags: [marketplace]
+      summary: Delete product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [marketplace]
+      summary: List orders for current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: createOrder
+      tags: [marketplace]
+      summary: Place an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [marketplace]
+      summary: Get order details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /products/featured:
+    get:
+      operationId: getFeaturedProducts
+      tags: [marketplace]
+      summary: Get featured/top products
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  # ── JOBS ──────────────────────────────────────────────────────────
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List job listings
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [fulltime, parttime, freelance]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: location
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+    post:
+      operationId: createJob
+      tags: [jobs]
+      summary: Post a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get job details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+
+  /jobs/{id}/apply:
+    post:
+      operationId: applyToJob
+      tags: [jobs]
+      summary: Apply to a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /applications:
+    get:
+      operationId: listApplications
+      tags: [jobs]
+      summary: List my job applications
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+
+  # ── EDUCATION ────────────────────────────────────────────────────
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [education]
+      summary: List available courses
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: level
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+
+  /courses/{id}:
+    get:
+      operationId: getCourse
+      tags: [education]
+      summary: Get course details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseDetail"
+
+  /courses/{id}/enroll:
+    post:
+      operationId: enrollCourse
+      tags: [education]
+      summary: Enroll in a course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollInput"
+      responses:
+        "201":
+          description: Enrolled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment"
+
+  /enrollments:
+    get:
+      operationId: listEnrollments
+      tags: [education]
+      summary: List my course enrollments
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Enrollment"
+
+  /courses/featured:
+    get:
+      operationId: getFeaturedCourses
+      tags: [education]
+      summary: Get featured courses
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+
+  # ── SOCIAL / RÉSEAU PRO ──────────────────────────────────────────
+  /posts:
+    get:
+      operationId: listPosts
+      tags: [social]
+      summary: List social feed posts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+    post:
+      operationId: createPost
+      tags: [social]
+      summary: Create a post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/{id}:
+    get:
+      operationId: getPost
+      tags: [social]
+      summary: Get post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+    delete:
+      operationId: deletePost
+      tags: [social]
+      summary: Delete post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /posts/{id}/like:
+    post:
+      operationId: likePost
+      tags: [social]
+      summary: Like a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LikeInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /messages:
+    get:
+      operationId: listMessages
+      tags: [social]
+      summary: List conversations
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+    post:
+      operationId: sendMessage
+      tags: [social]
+      summary: Send a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /messages/{userId}:
+    get:
+      operationId: getConversation
+      tags: [social]
+      summary: Get messages with a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+  # ── ADMIN ────────────────────────────────────────────────────────
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Admin dashboard stats
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin]
+      summary: List all users (admin)
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /admin/users/{id}/status:
+    patch:
+      operationId: updateUserStatus
+      tags: [admin]
+      summary: Update user status (ban/activate)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserStatusUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    # ── AUTH ──────────────────────────────────────────────────────
+    RegisterInput:
+      type: object
+      required: [firstName, lastName, email, phone, password, country]
+      properties:
+        firstName: { type: string, minLength: 1 }
+        lastName:  { type: string, minLength: 1 }
+        email:     { type: string, format: email }
+        phone:     { type: string }
+        password:  { type: string, minLength: 6 }
+        country:   { type: string }
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string }
+        password: { type: string }
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string }
+        user:
+          $ref: "#/components/schemas/User"
+
+    # ── USERS ─────────────────────────────────────────────────────
+    User:
+      type: object
+      required: [id, firstName, lastName, email, phone, country, role, status, createdAt]
+      properties:
+        id:         { type: integer }
+        firstName:  { type: string }
+        lastName:   { type: string }
+        email:      { type: string }
+        phone:      { type: string }
+        country:    { type: string }
+        avatarUrl:  { type: ["string", "null"] }
+        coverUrl:   { type: ["string", "null"] }
+        bio:        { type: ["string", "null"] }
+        role:       { type: string, enum: [user, admin] }
+        status:     { type: string, enum: [active, banned] }
+        createdAt:  { type: string }
+
+    UserUpdate:
+      type: object
+      properties:
+        firstName: { type: string }
+        lastName:  { type: string }
+        phone:     { type: string }
+        country:   { type: string }
+        bio:       { type: string }
+        avatarUrl: { type: string }
+        coverUrl:  { type: string }
+
+    UserStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [active, banned] }
+
+    # ── WALLET ────────────────────────────────────────────────────
+    Wallet:
+      type: object
+      required: [id, userId, balance, currency, createdAt]
+      properties:
+        id:        { type: integer }
+        userId:    { type: integer }
+        balance:   { type: number }
+        currency:  { type: string }
+        createdAt: { type: string }
+
+    Transaction:
+      type: object
+      required: [id, type, amount, currency, status, createdAt]
+      properties:
+        id:          { type: integer }
+        type:        { type: string, enum: [deposit, withdrawal, transfer, payment] }
+        amount:      { type: number }
+        currency:    { type: string }
+        status:      { type: string, enum: [pending, completed, failed] }
+        description: { type: ["string", "null"] }
+        fromUserId:  { type: ["integer", "null"] }
+        toUserId:    { type: ["integer", "null"] }
+        createdAt:   { type: string }
+
+    TransferInput:
+      type: object
+      required: [toUserId, amount, currency]
+      properties:
+        toUserId:    { type: integer }
+        amount:      { type: number }
+        currency:    { type: string }
+        description: { type: string }
+
+    DepositInput:
+      type: object
+      required: [amount, currency, operator, phone]
+      properties:
+        amount:   { type: number }
+        currency: { type: string }
+        operator: { type: string, enum: [mtn, moov, orange] }
+        phone:    { type: string }
+
+    WalletStats:
+      type: object
+      required: [balance, totalIncome, totalExpenses, transactionsCount]
+      properties:
+        balance:            { type: number }
+        totalIncome:        { type: number }
+        totalExpenses:      { type: number }
+        transactionsCount:  { type: integer }
+        currency:           { type: string }
+
+    # ── TONTINES ──────────────────────────────────────────────────
+    Tontine:
+      type: object
+      required: [id, name, contributionAmount, currency, frequency, membersCount, status, createdAt]
+      properties:
+        id:                 { type: integer }
+        name:               { type: string }
+        description:        { type: ["string", "null"] }
+        contributionAmount: { type: number }
+        currency:           { type: string }
+        frequency:          { type: string, enum: [weekly, monthly] }
+        membersCount:       { type: integer }
+        maxMembers:         { type: integer }
+        status:             { type: string, enum: [active, completed, paused] }
+        currentRound:       { type: integer }
+        createdAt:          { type: string }
+
+    TontineDetail:
+      type: object
+      required: [id, name, contributionAmount, currency, frequency, status, members, contributions, createdAt]
+      properties:
+        id:                 { type: integer }
+        name:               { type: string }
+        description:        { type: ["string", "null"] }
+        contributionAmount: { type: number }
+        currency:           { type: string }
+        frequency:          { type: string }
+        status:             { type: string }
+        currentRound:       { type: integer }
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/TontineMember"
+        contributions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contribution"
+        createdAt: { type: string }
+
+    TontineMember:
+      type: object
+      required: [id, tontineId, userId, turnOrder, hasReceived, joinedAt]
+      properties:
+        id:          { type: integer }
+        tontineId:   { type: integer }
+        userId:      { type: integer }
+        turnOrder:   { type: integer }
+        hasReceived: { type: boolean }
+        joinedAt:    { type: string }
+
+    Contribution:
+      type: object
+      required: [id, tontineId, userId, amount, round, status, createdAt]
+      properties:
+        id:        { type: integer }
+        tontineId: { type: integer }
+        userId:    { type: integer }
+        amount:    { type: number }
+        round:     { type: integer }
+        status:    { type: string, enum: [pending, paid] }
+        createdAt: { type: string }
+
+    TontineInput:
+      type: object
+      required: [name, contributionAmount, currency, frequency, maxMembers]
+      properties:
+        name:               { type: string, minLength: 1 }
+        description:        { type: string }
+        contributionAmount: { type: number }
+        currency:           { type: string }
+        frequency:          { type: string, enum: [weekly, monthly] }
+        maxMembers:         { type: integer }
+
+    ContributionInput:
+      type: object
+      required: [amount]
+      properties:
+        amount: { type: number }
+
+    JoinTontineInput:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: integer }
+
+    # ── MARKETPLACE ──────────────────────────────────────────────
+    Product:
+      type: object
+      required: [id, title, price, currency, category, status, sellerId, createdAt]
+      properties:
+        id:          { type: integer }
+        title:       { type: string }
+        description: { type: ["string", "null"] }
+        price:       { type: number }
+        currency:    { type: string }
+        category:    { type: string }
+        imageUrl:    { type: ["string", "null"] }
+        status:      { type: string, enum: [active, sold, paused] }
+        sellerId:    { type: integer }
+        location:    { type: ["string", "null"] }
+        createdAt:   { type: string }
+
+    ProductInput:
+      type: object
+      required: [title, price, currency, category]
+      properties:
+        title:       { type: string, minLength: 1 }
+        description: { type: string }
+        price:       { type: number }
+        currency:    { type: string }
+        category:    { type: string }
+        imageUrl:    { type: string }
+        location:    { type: string }
+
+    ProductUpdate:
+      type: object
+      properties:
+        title:       { type: string }
+        description: { type: string }
+        price:       { type: number }
+        status:      { type: string, enum: [active, sold, paused] }
+        imageUrl:    { type: string }
+
+    Order:
+      type: object
+      required: [id, productId, buyerId, amount, currency, status, createdAt]
+      properties:
+        id:        { type: integer }
+        productId: { type: integer }
+        buyerId:   { type: integer }
+        amount:    { type: number }
+        currency:  { type: string }
+        status:    { type: string, enum: [pending, confirmed, shipped, delivered, cancelled] }
+        createdAt: { type: string }
+
+    OrderInput:
+      type: object
+      required: [productId]
+      properties:
+        productId: { type: integer }
+
+    # ── JOBS ──────────────────────────────────────────────────────
+    Job:
+      type: object
+      required: [id, title, company, location, type, salary, currency, status, postedById, createdAt]
+      properties:
+        id:          { type: integer }
+        title:       { type: string }
+        company:     { type: string }
+        description: { type: ["string", "null"] }
+        location:    { type: string }
+        type:        { type: string, enum: [fulltime, parttime, freelance] }
+        salary:      { type: ["number", "null"] }
+        currency:    { type: string }
+        status:      { type: string, enum: [open, closed] }
+        postedById:  { type: integer }
+        skills:      { type: ["string", "null"] }
+        createdAt:   { type: string }
+
+    JobInput:
+      type: object
+      required: [title, company, location, type, currency]
+      properties:
+        title:       { type: string, minLength: 1 }
+        company:     { type: string, minLength: 1 }
+        description: { type: string }
+        location:    { type: string }
+        type:        { type: string, enum: [fulltime, parttime, freelance] }
+        salary:      { type: number }
+        currency:    { type: string }
+        skills:      { type: string }
+
+    Application:
+      type: object
+      required: [id, jobId, applicantId, status, createdAt]
+      properties:
+        id:          { type: integer }
+        jobId:       { type: integer }
+        applicantId: { type: integer }
+        coverLetter: { type: ["string", "null"] }
+        cvUrl:       { type: ["string", "null"] }
+        status:      { type: string, enum: [pending, reviewed, accepted, rejected] }
+        createdAt:   { type: string }
+
+    ApplicationInput:
+      type: object
+      properties:
+        coverLetter: { type: string }
+        cvUrl:       { type: string }
+
+    # ── EDUCATION ────────────────────────────────────────────────
+    Course:
+      type: object
+      required: [id, title, category, level, instructorId, duration, enrollmentsCount, createdAt]
+      properties:
+        id:               { type: integer }
+        title:            { type: string }
+        description:      { type: ["string", "null"] }
+        category:         { type: string }
+        level:            { type: string, enum: [beginner, intermediate, advanced] }
+        imageUrl:         { type: ["string", "null"] }
+        instructorId:     { type: integer }
+        duration:         { type: integer }
+        enrollmentsCount: { type: integer }
+        isFree:           { type: boolean }
+        price:            { type: ["number", "null"] }
+        currency:         { type: ["string", "null"] }
+        createdAt:        { type: string }
+
+    CourseDetail:
+      type: object
+      required: [id, title, category, level, instructorId, duration, enrollmentsCount, lessons, createdAt]
+      properties:
+        id:               { type: integer }
+        title:            { type: string }
+        description:      { type: ["string", "null"] }
+        category:         { type: string }
+        level:            { type: string }
+        imageUrl:         { type: ["string", "null"] }
+        instructorId:     { type: integer }
+        duration:         { type: integer }
+        enrollmentsCount: { type: integer }
+        isFree:           { type: boolean }
+        price:            { type: ["number", "null"] }
+        currency:         { type: ["string", "null"] }
+        lessons:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lesson"
+        createdAt: { type: string }
+
+    Lesson:
+      type: object
+      required: [id, courseId, title, duration, order]
+      properties:
+        id:       { type: integer }
+        courseId: { type: integer }
+        title:    { type: string }
+        content:  { type: ["string", "null"] }
+        videoUrl: { type: ["string", "null"] }
+        duration: { type: integer }
+        order:    { type: integer }
+
+    Enrollment:
+      type: object
+      required: [id, courseId, userId, progress, status, enrolledAt]
+      properties:
+        id:         { type: integer }
+        courseId:   { type: integer }
+        userId:     { type: integer }
+        progress:   { type: integer }
+        status:     { type: string, enum: [active, completed] }
+        enrolledAt: { type: string }
+
+    EnrollInput:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: integer }
+
+    # ── SOCIAL ────────────────────────────────────────────────────
+    Post:
+      type: object
+      required: [id, authorId, content, likesCount, commentsCount, createdAt]
+      properties:
+        id:            { type: integer }
+        authorId:      { type: integer }
+        content:       { type: string }
+        imageUrl:      { type: ["string", "null"] }
+        likesCount:    { type: integer }
+        commentsCount: { type: integer }
+        createdAt:     { type: string }
+
+    PostInput:
+      type: object
+      required: [content]
+      properties:
+        content:  { type: string, minLength: 1 }
+        imageUrl: { type: string }
+
+    LikeInput:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [like, unlike] }
+
+    Conversation:
+      type: object
+      required: [userId, lastMessage, unreadCount]
+      properties:
+        userId:      { type: integer }
+        lastMessage: { type: string }
+        unreadCount: { type: integer }
+        updatedAt:   { type: string }
+
+    Message:
+      type: object
+      required: [id, fromUserId, toUserId, content, createdAt]
+      properties:
+        id:         { type: integer }
+        fromUserId: { type: integer }
+        toUserId:   { type: integer }
+        content:    { type: string }
+        isRead:     { type: boolean }
+        createdAt:  { type: string }
+
+    MessageInput:
+      type: object
+      required: [toUserId, content]
+      properties:
+        toUserId: { type: integer }
+        content:  { type: string, minLength: 1 }
+
+    # ── ADMIN ────────────────────────────────────────────────────
+    AdminStats:
+      type: object
+      required: [totalUsers, totalTransactions, totalProducts, totalJobs, totalCourses, totalRevenue]
+      properties:
+        totalUsers:        { type: integer }
+        totalTransactions: { type: integer }
+        totalProducts:     { type: integer }
+        totalJobs:         { type: integer }
+        totalCourses:      { type: integer }
+        totalRevenue:      { type: number }
+        newUsersToday:     { type: integer }
+        activeUsers:       { type: integer }
