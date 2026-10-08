@@ -29,6 +29,74 @@ tags:
     description: Administration
 
 paths:
+  /presence/session:
+    post:
+      operationId: updatePresenceSession
+      tags: [social]
+      summary: Refresh or close the authenticated browser session presence lease
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresenceSessionInput"
+      responses:
+        "204": { description: Presence updated }
+        "400": { description: Invalid session }
+        "401": { description: Authentication required }
+  /chat-groups/{id}/activity:
+    get:
+      operationId: getChatGroupActivity
+      tags: [social]
+      summary: Get current membership count, distinct active members and typing members
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Current group activity, excluding the requester from typing indicators
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [membersCount, onlineCount, typing]
+                properties:
+                  membersCount: { type: integer }
+                  onlineCount: { type: integer }
+                  typing:
+                    type: array
+                    items:
+                      type: object
+                      required: [userId, name]
+                      properties:
+                        userId: { type: integer }
+                        name: { type: string }
+        "400": { description: Invalid group }
+        "401": { description: Authentication required }
+        "403": { description: Group membership required }
+  /chat-groups/{id}/typing:
+    post:
+      operationId: updateChatGroupTyping
+      tags: [social]
+      summary: Update the authenticated member's expiring typing indicator
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatGroupTypingInput"
+      responses:
+        "204": { description: Typing updated }
+        "400": { description: Invalid activity }
+        "401": { description: Authentication required }
+        "403": { description: Group membership required }
   /music/search:
     get:
       operationId: searchMusic
@@ -936,6 +1004,18 @@ paths:
 
 components:
   schemas:
+    PresenceSessionInput:
+      type: object
+      required: [sessionId, online]
+      properties:
+        sessionId: { type: string, format: uuid }
+        online: { type: boolean }
+    ChatGroupTypingInput:
+      type: object
+      required: [sessionId, typing]
+      properties:
+        sessionId: { type: string, format: uuid }
+        typing: { type: boolean }
     MusicSearchTrack:
       type: object
       required: [id, title, artist, duration, genre, previewUrl, artworkUrl]

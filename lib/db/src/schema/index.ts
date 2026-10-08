@@ -10,3 +10,4 @@ export * from "./gifts";
 export * from "./storage";
 export * from "./broadcast";
 export * from "./people";
+export * from "./chat-presence";

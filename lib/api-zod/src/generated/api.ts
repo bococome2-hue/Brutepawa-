@@ -9,6 +9,49 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Refresh or close the authenticated browser session presence lease
+ */
+export const UpdatePresenceSessionBody = zod.object({
+  "sessionId": zod.string().uuid(),
+  "online": zod.boolean()
+})
+
+export const UpdatePresenceSessionResponse = zod.void()
+
+
+/**
+ * @summary Get current membership count, distinct active members and typing members
+ */
+export const GetChatGroupActivityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetChatGroupActivityResponse = zod.object({
+  "membersCount": zod.number(),
+  "onlineCount": zod.number(),
+  "typing": zod.array(zod.object({
+  "userId": zod.number(),
+  "name": zod.string()
+}))
+})
+
+
+/**
+ * @summary Update the authenticated member's expiring typing indicator
+ */
+export const UpdateChatGroupTypingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateChatGroupTypingBody = zod.object({
+  "sessionId": zod.string().uuid(),
+  "typing": zod.boolean()
+})
+
+export const UpdateChatGroupTypingResponse = zod.void()
+
+
+/**
  * @summary Search playable music previews
  */
 export const searchMusicQueryQMax = 120;

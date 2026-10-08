@@ -24,6 +24,7 @@ import type {
   Application,
   ApplicationInput,
   AuthResponse,
+  ChatGroupTypingInput,
   Contribution,
   ContributionInput,
   Conversation,
@@ -32,6 +33,7 @@ import type {
   DepositInput,
   EnrollInput,
   Enrollment,
+  GetChatGroupActivity200,
   HealthStatus,
   Job,
   JobInput,
@@ -50,6 +52,7 @@ import type {
   OrderInput,
   Post,
   PostInput,
+  PresenceSessionInput,
   Product,
   ProductInput,
   ProductUpdate,
@@ -80,6 +83,224 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getUpdatePresenceSessionUrl = () => {
+
+
+
+
+  return `/api/presence/session`
+}
+
+/**
+ * @summary Refresh or close the authenticated browser session presence lease
+ */
+export const updatePresenceSession = async (presenceSessionInput: PresenceSessionInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getUpdatePresenceSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(presenceSessionInput)
+  }
+);}
+
+
+
+
+export const getUpdatePresenceSessionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePresenceSession>>, TError,{data: BodyType<PresenceSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePresenceSession>>, TError,{data: BodyType<PresenceSessionInput>}, TContext> => {
+
+const mutationKey = ['updatePresenceSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePresenceSession>>, {data: BodyType<PresenceSessionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updatePresenceSession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePresenceSessionMutationResult = NonNullable<Awaited<ReturnType<typeof updatePresenceSession>>>
+    export type UpdatePresenceSessionMutationBody = BodyType<PresenceSessionInput>
+    export type UpdatePresenceSessionMutationError = ErrorType<void>
+
+    /**
+ * @summary Refresh or close the authenticated browser session presence lease
+ */
+export const useUpdatePresenceSession = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePresenceSession>>, TError,{data: BodyType<PresenceSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePresenceSession>>,
+        TError,
+        {data: BodyType<PresenceSessionInput>},
+        TContext
+      > => {
+      return useMutation(getUpdatePresenceSessionMutationOptions(options));
+    }
+
+export const getGetChatGroupActivityUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat-groups/${id}/activity`
+}
+
+/**
+ * @summary Get current membership count, distinct active members and typing members
+ */
+export const getChatGroupActivity = async (id: number, options?: RequestInit): Promise<GetChatGroupActivity200> => {
+
+  return customFetch<GetChatGroupActivity200>(getGetChatGroupActivityUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChatGroupActivityQueryKey = (id: number,) => {
+    return [
+    `/api/chat-groups/${id}/activity`
+    ] as const;
+    }
+
+
+export const getGetChatGroupActivityQueryOptions = <TData = Awaited<ReturnType<typeof getChatGroupActivity>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatGroupActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChatGroupActivityQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChatGroupActivity>>> = ({ signal }) => getChatGroupActivity(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChatGroupActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChatGroupActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getChatGroupActivity>>>
+export type GetChatGroupActivityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get current membership count, distinct active members and typing members
+ */
+
+export function useGetChatGroupActivity<TData = Awaited<ReturnType<typeof getChatGroupActivity>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatGroupActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChatGroupActivityQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateChatGroupTypingUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat-groups/${id}/typing`
+}
+
+/**
+ * @summary Update the authenticated member's expiring typing indicator
+ */
+export const updateChatGroupTyping = async (id: number,
+    chatGroupTypingInput: ChatGroupTypingInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getUpdateChatGroupTypingUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(chatGroupTypingInput)
+  }
+);}
+
+
+
+
+export const getUpdateChatGroupTypingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChatGroupTyping>>, TError,{id: number;data: BodyType<ChatGroupTypingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateChatGroupTyping>>, TError,{id: number;data: BodyType<ChatGroupTypingInput>}, TContext> => {
+
+const mutationKey = ['updateChatGroupTyping'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateChatGroupTyping>>, {id: number;data: BodyType<ChatGroupTypingInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateChatGroupTyping(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateChatGroupTypingMutationResult = NonNullable<Awaited<ReturnType<typeof updateChatGroupTyping>>>
+    export type UpdateChatGroupTypingMutationBody = BodyType<ChatGroupTypingInput>
+    export type UpdateChatGroupTypingMutationError = ErrorType<void>
+
+    /**
+ * @summary Update the authenticated member's expiring typing indicator
+ */
+export const useUpdateChatGroupTyping = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChatGroupTyping>>, TError,{id: number;data: BodyType<ChatGroupTypingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateChatGroupTyping>>,
+        TError,
+        {id: number;data: BodyType<ChatGroupTypingInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateChatGroupTypingMutationOptions(options));
+    }
 
 export const getSearchMusicUrl = (params: SearchMusicParams,) => {
   const normalizedParams = new URLSearchParams();

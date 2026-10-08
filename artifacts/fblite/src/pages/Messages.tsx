@@ -9,6 +9,7 @@ import { UserBadge } from "../components/UserBadge";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { useCallSignaling, type NewMessagePayload } from "../hooks/useCallSignaling";
 import { trackEvent } from "../lib/analytics";
+import { useGroupActivity } from "../hooks/useGroupActivity";
 
 void ({} as ApiChatGroup);
 
@@ -651,6 +652,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const [groupInfo, setGroupInfo]           = useState<ApiChatGroupInfo | null>(null);
   const [showGroupInfo, setShowGroupInfo]   = useState(false);
   const [groupNewMsg, setGroupNewMsg]       = useState("");
+  const groupActivity = useGroupActivity(activeGroupId, groupNewMsg);
   const [dismissedAddBanner, setDismissedAddBanner]   = useState<Set<number>>(new Set());
   const [dismissedInfoPanel, setDismissedInfoPanel]   = useState<Set<number>>(new Set());
 
@@ -6157,7 +6159,15 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
             </div>
             <div style={{ flex:1, minWidth:0, cursor:"pointer" }} onClick={() => setShowGroupInfo(true)}>
               <div style={{ fontWeight:700, fontSize:15.5, color:"#111827", lineHeight:1.25, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{grp?.name ?? "Groupe"}</div>
-              <div style={{ fontSize:11.5, color:"#9CA3AF" }}>{grp?.membersCount ?? 0} membre{(grp?.membersCount ?? 0) !== 1 ? "s" : ""}</div>
+              <div style={{ fontSize:11.5, color:"#64748B" }}>
+                {groupActivity?.membersCount ?? grp?.membersCount ?? 0} membre{(groupActivity?.membersCount ?? grp?.membersCount ?? 0) !== 1 ? "s" : ""}
+                {groupActivity ? ` · ${groupActivity.onlineCount} en ligne` : " · Statut en ligne indisponible"}
+              </div>
+              {groupActivity && groupActivity.typing.length > 0 && <div aria-live="polite"
+                title={groupActivity.typing.map(member => `${member.name} écrit`).join(", ")}
+                style={{ fontSize:12, color:"var(--bp-primary)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                {groupActivity.typing.map(member => `${member.name} écrit`).join(", ")}…
+              </div>}
             </div>
             <button onClick={() => setShowGrpMenu(m => !m)}
               style={{ background:"none", border:"none", width:40, height:40, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>

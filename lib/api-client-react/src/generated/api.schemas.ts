@@ -5,6 +5,16 @@
  * AfriConnect API - Super-app for West Africa
  * OpenAPI spec version: 0.1.0
  */
+export interface PresenceSessionInput {
+  sessionId: string;
+  online: boolean;
+}
+
+export interface ChatGroupTypingInput {
+  sessionId: string;
+  typing: boolean;
+}
+
 export interface MusicSearchTrack {
   id: string;
   title: string;
@@ -579,6 +589,17 @@ export interface AdminStats {
   newUsersToday?: number;
   activeUsers?: number;
 }
+
+export type GetChatGroupActivity200TypingItem = {
+  userId: number;
+  name: string;
+};
+
+export type GetChatGroupActivity200 = {
+  membersCount: number;
+  onlineCount: number;
+  typing: GetChatGroupActivity200TypingItem[];
+};
 
 export type SearchMusicParams = {
 /**

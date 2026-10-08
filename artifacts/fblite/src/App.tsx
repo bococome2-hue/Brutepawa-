@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Component, ReactNode } from "react";
 import { Router, useLocation, useNavigate } from "./router";
 import { isUserLoggedIn } from "./hooks/useCurrentUser";
+import { usePresenceHeartbeat } from "./hooks/useGroupActivity";
 import Layout from "./Layout";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -268,6 +269,7 @@ function matchDynamic(pattern: string, path: string): Record<string, string> | n
 
 function PushAutoSubscribe() {
   const isAuth = isUserLoggedIn();
+  usePresenceHeartbeat(isAuth);
   const { permission, subscribed, subscribe } = usePushNotifications();
 
   useEffect(() => {
