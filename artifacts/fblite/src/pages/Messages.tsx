@@ -721,7 +721,9 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const [grpMembersData, setGrpMembersData]         = useState<import("../lib/api").ApiChatGroupMembersGrouped | null>(null);
   const grpPriceTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
   const [showGrpStats, setShowGrpStats]             = useState(false);
-  const grpStats = useGroupStatistics(activeGroupId, showGroupInfo || showGrpStats);
+  const [grpStatsPeriod, setGrpStatsPeriod] = useState<"24h" | "7d" | "30d" | "90d">("7d");
+  const [grpStatsRange, setGrpStatsRange] = useState<{ start: string; end: string } | null>(null);
+  const grpStats = useGroupStatistics(activeGroupId, showGroupInfo || showGrpStats, showGrpStats ? grpStatsPeriod : "7d", showGrpStats ? grpStatsRange : null);
   const [showGrpAllActions, setShowGrpAllActions]   = useState(false);
   const [showGrpInfoMuteSheet, setShowGrpInfoMuteSheet] = useState(false);
   /* ─── Group audit log ─── */
@@ -4331,7 +4333,12 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   /* ── STATISTIQUES ── */
   if (activeGroupId !== null && showGrpStats) {
     const grp = chatGroups.find(g => g.id === activeGroupId);
-    return <GroupStatisticsPanel title={grp?.name ?? "Groupe"} data={grpStats.data} loading={grpStats.loading} error={grpStats.error} onRetry={grpStats.reload} onClose={() => setShowGrpStats(false)} />;
+    return <GroupStatisticsPanel title={grp?.name ?? "Groupe"} data={grpStats.data} loading={grpStats.loading} error={grpStats.error} onRetry={grpStats.reload}
+      period={grpStatsPeriod} onPeriodChange={value => { setGrpStatsRange(null); setGrpStatsPeriod(value); }}
+      onRangeChange={(start, end) => setGrpStatsRange({ start, end })}
+      onMembers={() => { setShowGrpStats(false); setShowGrpMembers(true); }}
+      onModeration={grp?.role === "owner" || grp?.role === "admin" ? () => { setShowGrpStats(false); setShowGroupInfo(true); setBotSection("moderation"); setShowChatBot(true); } : undefined}
+      onClose={() => setShowGrpStats(false)} />;
   }
 
   if (activeGroupId !== null && showGroupInfo && showGrpEdit) {

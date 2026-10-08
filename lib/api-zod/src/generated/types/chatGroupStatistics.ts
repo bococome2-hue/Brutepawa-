@@ -6,7 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ChatGroupStatisticsDailyItem } from './chatGroupStatisticsDailyItem';
+import type { ChatGroupStatisticsGrowthItem } from './chatGroupStatisticsGrowthItem';
+import type { ChatGroupStatisticsMessageTypes } from './chatGroupStatisticsMessageTypes';
+import type { ChatGroupStatisticsPeriod } from './chatGroupStatisticsPeriod';
 import type { ChatGroupStatisticsRecentActivityItem } from './chatGroupStatisticsRecentActivityItem';
+import type { ChatGroupStatisticsTrends } from './chatGroupStatisticsTrends';
 
 export interface ChatGroupStatistics {
   groupId: number;
@@ -22,6 +26,21 @@ export interface ChatGroupStatistics {
   reactionsLast7Days: number | null;
   lastMessageAt: Date | null;
   viewDefinition: string;
+  period?: ChatGroupStatisticsPeriod;
+  customRange?: boolean;
+  messagesInPeriod?: number;
+  writersInPeriod?: number;
+  viewsInPeriod?: number;
+  readersInPeriod?: number;
+  messageTypes?: ChatGroupStatisticsMessageTypes;
+  /** Null until reliable historical membership tracking is available. */
+  growth?: ChatGroupStatisticsGrowthItem[] | null;
+  joinedInPeriod?: number | null;
+  leftInPeriod?: number | null;
+  reactionsInPeriod?: number | null;
+  repliesInPeriod?: number | null;
+  sharesInPeriod?: number | null;
+  trends?: ChatGroupStatisticsTrends;
   daily: ChatGroupStatisticsDailyItem[];
   recentActivity: ChatGroupStatisticsRecentActivityItem[];
 }

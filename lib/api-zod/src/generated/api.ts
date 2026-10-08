@@ -478,12 +478,16 @@ export const GetChatGroupActivityResponse = zod.object({
 
 
 /**
- * @summary Real persisted group statistics for seven local calendar days
+ * @summary Real persisted group statistics for a selected period
  */
 export const getChatGroupStatisticsQueryTimezoneDefault = `UTC`;
+export const getChatGroupStatisticsQueryPeriodDefault = `7d`;
 
 export const GetChatGroupStatisticsQueryParams = zod.object({
-  "timezone": zod.string().default(getChatGroupStatisticsQueryTimezoneDefault)
+  "timezone": zod.string().default(getChatGroupStatisticsQueryTimezoneDefault),
+  "period": zod.enum(['24h', '7d', '30d', '90d']).default(getChatGroupStatisticsQueryPeriodDefault),
+  "start": zod.date().optional().describe('Custom inclusive start date; supply end as well. Maximum 93 calendar days.'),
+  "end": zod.date().optional().describe('Custom inclusive end date, no later than today in the requested time zone.')
 })
 
 export const GetChatGroupStatisticsResponse = zod.object({
@@ -500,6 +504,33 @@ export const GetChatGroupStatisticsResponse = zod.object({
   "reactionsLast7Days": zod.number().nullable(),
   "lastMessageAt": zod.date().nullable(),
   "viewDefinition": zod.string(),
+  "period": zod.enum(['24h', '7d', '30d', '90d']).optional(),
+  "customRange": zod.boolean().optional(),
+  "messagesInPeriod": zod.number().optional(),
+  "writersInPeriod": zod.number().optional(),
+  "viewsInPeriod": zod.number().optional(),
+  "readersInPeriod": zod.number().optional(),
+  "messageTypes": zod.object({
+  "total": zod.number(),
+  "text": zod.number(),
+  "images": zod.number(),
+  "videos": zod.number(),
+  "voice": zod.number(),
+  "files": zod.number(),
+  "gif": zod.number(),
+  "links": zod.number(),
+  "other": zod.number()
+}).optional(),
+  "growth": zod.array(zod.object({
+  "day": zod.date(),
+  "members": zod.number()
+})).nullish().describe('Null until reliable historical membership tracking is available.'),
+  "joinedInPeriod": zod.number().nullish(),
+  "leftInPeriod": zod.number().nullish(),
+  "reactionsInPeriod": zod.number().nullish(),
+  "repliesInPeriod": zod.number().nullish(),
+  "sharesInPeriod": zod.number().nullish(),
+  "trends": zod.record(zod.string(), zod.number().nullable()).nullish(),
   "daily": zod.array(zod.object({
   "day": zod.date(),
   "messages": zod.number(),

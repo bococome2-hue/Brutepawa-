@@ -5,7 +5,17 @@
  * AfriConnect API - Super-app for West Africa
  * OpenAPI spec version: 0.1.0
  */
+import type { GetChatGroupStatisticsPeriod } from './getChatGroupStatisticsPeriod';
 
 export type GetChatGroupStatisticsParams = {
 timezone?: string;
+period?: GetChatGroupStatisticsPeriod;
+/**
+ * Custom inclusive start date; supply end as well. Maximum 93 calendar days.
+ */
+start?: Date;
+/**
+ * Custom inclusive end date, no later than today in the requested time zone.
+ */
+end?: Date;
 };

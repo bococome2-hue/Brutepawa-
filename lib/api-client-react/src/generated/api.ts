@@ -696,7 +696,7 @@ export const getGetChatGroupStatisticsUrl = (id: number,
 }
 
 /**
- * @summary Real persisted group statistics for seven local calendar days
+ * @summary Real persisted group statistics for a selected period
  */
 export const getChatGroupStatistics = async (id: number,
     params?: GetChatGroupStatisticsParams, options?: RequestInit): Promise<ChatGroupStatistics> => {
@@ -746,7 +746,7 @@ export type GetChatGroupStatisticsQueryError = ErrorType<void>
 
 
 /**
- * @summary Real persisted group statistics for seven local calendar days
+ * @summary Real persisted group statistics for a selected period
  */
 
 export function useGetChatGroupStatistics<TData = Awaited<ReturnType<typeof getChatGroupStatistics>>, TError = ErrorType<void>>(

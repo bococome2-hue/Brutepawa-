@@ -58,6 +58,11 @@ export default defineConfig({
       strict: true,
     },
     proxy: {
+      "/__mockup": {
+        target: "http://localhost:22853",
+        changeOrigin: true,
+        ws: true,
+      },
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,

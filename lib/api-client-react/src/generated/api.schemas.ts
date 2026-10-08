@@ -9,6 +9,35 @@ export interface ChatGroupView {
   visitId: string;
 }
 
+export type ChatGroupStatisticsPeriod = typeof ChatGroupStatisticsPeriod[keyof typeof ChatGroupStatisticsPeriod];
+
+
+export const ChatGroupStatisticsPeriod = {
+  '24h': '24h',
+  '7d': '7d',
+  '30d': '30d',
+  '90d': '90d',
+} as const;
+
+export type ChatGroupStatisticsMessageTypes = {
+  total: number;
+  text: number;
+  images: number;
+  videos: number;
+  voice: number;
+  files: number;
+  gif: number;
+  links: number;
+  other: number;
+};
+
+export type ChatGroupStatisticsGrowthItem = {
+  day: string;
+  members: number;
+};
+
+export type ChatGroupStatisticsTrends = {[key: string]: number | null} | null;
+
 export type ChatGroupStatisticsDailyItem = {
   day: string;
   messages: number;
@@ -44,6 +73,21 @@ export interface ChatGroupStatistics {
   reactionsLast7Days: number | null;
   lastMessageAt: string | null;
   viewDefinition: string;
+  period?: ChatGroupStatisticsPeriod;
+  customRange?: boolean;
+  messagesInPeriod?: number;
+  writersInPeriod?: number;
+  viewsInPeriod?: number;
+  readersInPeriod?: number;
+  messageTypes?: ChatGroupStatisticsMessageTypes;
+  /** Null until reliable historical membership tracking is available. */
+  growth?: ChatGroupStatisticsGrowthItem[] | null;
+  joinedInPeriod?: number | null;
+  leftInPeriod?: number | null;
+  reactionsInPeriod?: number | null;
+  repliesInPeriod?: number | null;
+  sharesInPeriod?: number | null;
+  trends?: ChatGroupStatisticsTrends;
   daily: ChatGroupStatisticsDailyItem[];
   recentActivity: ChatGroupStatisticsRecentActivityItem[];
 }
@@ -905,7 +949,26 @@ export type GetChatGroupActivity200 = {
 
 export type GetChatGroupStatisticsParams = {
 timezone?: string;
+period?: GetChatGroupStatisticsPeriod;
+/**
+ * Custom inclusive start date; supply end as well. Maximum 93 calendar days.
+ */
+start?: string;
+/**
+ * Custom inclusive end date, no later than today in the requested time zone.
+ */
+end?: string;
 };
+
+export type GetChatGroupStatisticsPeriod = typeof GetChatGroupStatisticsPeriod[keyof typeof GetChatGroupStatisticsPeriod];
+
+
+export const GetChatGroupStatisticsPeriod = {
+  '24h': '24h',
+  '7d': '7d',
+  '30d': '30d',
+  '90d': '90d',
+} as const;
 
 export type SearchMusicParams = {
 /**

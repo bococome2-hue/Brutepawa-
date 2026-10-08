@@ -187,7 +187,7 @@ paths:
     get:
       operationId: getChatGroupStatistics
       tags: [social]
-      summary: Real persisted group statistics for seven local calendar days
+      summary: Real persisted group statistics for a selected period
       parameters:
         - in: path
           name: id
@@ -196,6 +196,17 @@ paths:
         - in: query
           name: timezone
           schema: { type: string, default: UTC }
+        - in: query
+          name: period
+          schema: { type: string, enum: [24h, 7d, 30d, 90d], default: 7d }
+        - in: query
+          name: start
+          description: Custom inclusive start date; supply end as well. Maximum 93 calendar days.
+          schema: { type: string, format: date }
+        - in: query
+          name: end
+          description: Custom inclusive end date, no later than today in the requested time zone.
+          schema: { type: string, format: date }
       responses:
         "200":
           description: Counts from the database; unavailable reaction tracking is null
@@ -1178,6 +1189,44 @@ components:
         reactionsLast7Days: { type: integer, nullable: true }
         lastMessageAt: { type: string, format: date-time, nullable: true }
         viewDefinition: { type: string }
+        period: { type: string, enum: [24h, 7d, 30d, 90d] }
+        customRange: { type: boolean }
+        messagesInPeriod: { type: integer }
+        writersInPeriod: { type: integer }
+        viewsInPeriod: { type: integer }
+        readersInPeriod: { type: integer }
+        messageTypes:
+          type: object
+          required: [total, text, images, videos, voice, files, gif, links, other]
+          properties:
+            total: { type: integer }
+            text: { type: integer }
+            images: { type: integer }
+            videos: { type: integer }
+            voice: { type: integer }
+            files: { type: integer }
+            gif: { type: integer }
+            links: { type: integer }
+            other: { type: integer }
+        growth:
+          type: array
+          nullable: true
+          description: Null until reliable historical membership tracking is available.
+          items:
+            type: object
+            required: [day, members]
+            properties:
+              day: { type: string, format: date }
+              members: { type: integer }
+        joinedInPeriod: { type: integer, nullable: true }
+        leftInPeriod: { type: integer, nullable: true }
+        reactionsInPeriod: { type: integer, nullable: true }
+        repliesInPeriod: { type: integer, nullable: true }
+        sharesInPeriod: { type: integer, nullable: true }
+        trends:
+          type: object
+          nullable: true
+          additionalProperties: { type: number, nullable: true }
         daily:
           type: array
           items:
