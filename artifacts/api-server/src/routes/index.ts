@@ -37,6 +37,7 @@ import pollsRouter from "./polls";
 import musicRouter from "./music";
 import chatActivityRouter from "./chatActivity";
 import chatBotRouter from "./chatBot";
+import chatStatisticsRouter from "./chatStatistics";
 
 const router: IRouter = Router();
 
@@ -78,5 +79,6 @@ router.use(pollsRouter);
 router.use(musicRouter);
 router.use(chatActivityRouter);
 router.use(chatBotRouter);
+router.use(chatStatisticsRouter);
 
 export default router;

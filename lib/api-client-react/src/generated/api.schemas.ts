@@ -5,6 +5,49 @@
  * AfriConnect API - Super-app for West Africa
  * OpenAPI spec version: 0.1.0
  */
+export interface ChatGroupView {
+  visitId: string;
+}
+
+export type ChatGroupStatisticsDailyItem = {
+  day: string;
+  messages: number;
+  views: number;
+};
+
+export type ChatGroupStatisticsRecentActivityItemType = typeof ChatGroupStatisticsRecentActivityItemType[keyof typeof ChatGroupStatisticsRecentActivityItemType];
+
+
+export const ChatGroupStatisticsRecentActivityItemType = {
+  text: 'text',
+  system: 'system',
+} as const;
+
+export type ChatGroupStatisticsRecentActivityItem = {
+  id: number;
+  name: string;
+  type: ChatGroupStatisticsRecentActivityItemType;
+  createdAt: string;
+};
+
+export interface ChatGroupStatistics {
+  groupId: number;
+  timeZone: string;
+  periodStart: string;
+  periodEnd: string;
+  membersTotal: number;
+  messagesToday: number;
+  messagesLast7Days: number;
+  writersLast7Days: number;
+  viewsLast7Days: number;
+  readersLast7Days: number;
+  reactionsLast7Days: number | null;
+  lastMessageAt: string | null;
+  viewDefinition: string;
+  daily: ChatGroupStatisticsDailyItem[];
+  recentActivity: ChatGroupStatisticsRecentActivityItem[];
+}
+
 export interface ChatBotSettings {
   enabled: boolean;
   antiSpam: boolean;
@@ -704,6 +747,8 @@ export interface AdminStats {
   activeUsers?: number;
 }
 
+export type ChatGroupViewInputBody = ChatGroupView;
+
 export type UpdateChatBot200 = {
   settings: ChatBotSettings;
 };
@@ -720,7 +765,12 @@ export type GetChatGroupActivity200TypingItem = {
 export type GetChatGroupActivity200 = {
   membersCount: number;
   onlineCount: number;
+  onlineUserIds: number[];
   typing: GetChatGroupActivity200TypingItem[];
+};
+
+export type GetChatGroupStatisticsParams = {
+timezone?: string;
 };
 
 export type SearchMusicParams = {

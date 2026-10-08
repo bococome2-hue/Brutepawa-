@@ -232,11 +232,63 @@ export const GetChatGroupActivityParams = zod.object({
 export const GetChatGroupActivityResponse = zod.object({
   "membersCount": zod.number(),
   "onlineCount": zod.number(),
+  "onlineUserIds": zod.array(zod.number()),
   "typing": zod.array(zod.object({
   "userId": zod.number(),
   "name": zod.string()
 }))
 })
+
+
+/**
+ * @summary Real persisted group statistics for seven local calendar days
+ */
+export const getChatGroupStatisticsQueryTimezoneDefault = `UTC`;
+
+export const GetChatGroupStatisticsQueryParams = zod.object({
+  "timezone": zod.string().default(getChatGroupStatisticsQueryTimezoneDefault)
+})
+
+export const GetChatGroupStatisticsResponse = zod.object({
+  "groupId": zod.number(),
+  "timeZone": zod.string(),
+  "periodStart": zod.date(),
+  "periodEnd": zod.date(),
+  "membersTotal": zod.number(),
+  "messagesToday": zod.number(),
+  "messagesLast7Days": zod.number(),
+  "writersLast7Days": zod.number(),
+  "viewsLast7Days": zod.number(),
+  "readersLast7Days": zod.number(),
+  "reactionsLast7Days": zod.number().nullable(),
+  "lastMessageAt": zod.date().nullable(),
+  "viewDefinition": zod.string(),
+  "daily": zod.array(zod.object({
+  "day": zod.date(),
+  "messages": zod.number(),
+  "views": zod.number()
+})),
+  "recentActivity": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.enum(['text', 'system']),
+  "createdAt": zod.date()
+}))
+})
+
+
+/**
+ * @summary Record an actual opening of a group; retrying the visit ID is idempotent
+ */
+export const RecordChatGroupViewParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RecordChatGroupViewBody = zod.object({
+  "visitId": zod.string().uuid()
+})
+
+export const RecordChatGroupViewResponse = zod.void()
 
 
 /**

@@ -72,7 +72,8 @@ router.get("/chat-groups/:id/activity", requireAuth, async (req, res): Promise<v
       typing.set(session.userId, { userId: session.userId, name: `${session.firstName} ${session.lastName}`.trim() });
     }
   }
-  res.json({ membersCount: members.length, onlineCount: new Set(active.map(s => s.userId)).size, typing: [...typing.values()] });
+  const onlineUserIds = [...new Set(active.map(s => s.userId))];
+  res.json({ membersCount: members.length, onlineCount: onlineUserIds.length, onlineUserIds, typing: [...typing.values()] });
 });
 
 export default router;

@@ -56,6 +56,11 @@ export default defineConfig({
       clean: true,
       prettier: true,
       override: {
+        operations: {
+          // Path + query parameters otherwise both export the same *Params name.
+          // This route validates its path ID explicitly on the server.
+          getChatGroupStatistics: { zod: { generate: { param: false } } },
+        },
         zod: {
           coerce: {
             query: ['boolean', 'number', 'string'],

@@ -27,7 +27,9 @@ import type {
   ChatBotActionInput,
   ChatBotSettings,
   ChatBotState,
+  ChatGroupStatistics,
   ChatGroupTypingInput,
+  ChatGroupViewInputBody,
   Contribution,
   ContributionInput,
   Conversation,
@@ -37,6 +39,7 @@ import type {
   EnrollInput,
   Enrollment,
   GetChatGroupActivity200,
+  GetChatGroupStatisticsParams,
   HealthStatus,
   Job,
   JobInput,
@@ -454,6 +457,166 @@ export function useGetChatGroupActivity<TData = Awaited<ReturnType<typeof getCha
 
 
 
+
+export const getGetChatGroupStatisticsUrl = (id: number,
+    params?: GetChatGroupStatisticsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/chat-groups/${id}/statistics?${stringifiedParams}` : `/api/chat-groups/${id}/statistics`
+}
+
+/**
+ * @summary Real persisted group statistics for seven local calendar days
+ */
+export const getChatGroupStatistics = async (id: number,
+    params?: GetChatGroupStatisticsParams, options?: RequestInit): Promise<ChatGroupStatistics> => {
+
+  return customFetch<ChatGroupStatistics>(getGetChatGroupStatisticsUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChatGroupStatisticsQueryKey = (id: number,
+    params?: GetChatGroupStatisticsParams,) => {
+    return [
+    `/api/chat-groups/${id}/statistics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetChatGroupStatisticsQueryOptions = <TData = Awaited<ReturnType<typeof getChatGroupStatistics>>, TError = ErrorType<void>>(id: number,
+    params?: GetChatGroupStatisticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatGroupStatistics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChatGroupStatisticsQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChatGroupStatistics>>> = ({ signal }) => getChatGroupStatistics(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChatGroupStatistics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChatGroupStatisticsQueryResult = NonNullable<Awaited<ReturnType<typeof getChatGroupStatistics>>>
+export type GetChatGroupStatisticsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Real persisted group statistics for seven local calendar days
+ */
+
+export function useGetChatGroupStatistics<TData = Awaited<ReturnType<typeof getChatGroupStatistics>>, TError = ErrorType<void>>(
+ id: number,
+    params?: GetChatGroupStatisticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatGroupStatistics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChatGroupStatisticsQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRecordChatGroupViewUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat-groups/${id}/views`
+}
+
+/**
+ * @summary Record an actual opening of a group; retrying the visit ID is idempotent
+ */
+export const recordChatGroupView = async (id: number,
+    chatGroupViewInputBody: ChatGroupViewInputBody, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getRecordChatGroupViewUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(chatGroupViewInputBody)
+  }
+);}
+
+
+
+
+export const getRecordChatGroupViewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordChatGroupView>>, TError,{id: number;data: BodyType<ChatGroupViewInputBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordChatGroupView>>, TError,{id: number;data: BodyType<ChatGroupViewInputBody>}, TContext> => {
+
+const mutationKey = ['recordChatGroupView'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordChatGroupView>>, {id: number;data: BodyType<ChatGroupViewInputBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  recordChatGroupView(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordChatGroupViewMutationResult = NonNullable<Awaited<ReturnType<typeof recordChatGroupView>>>
+    export type RecordChatGroupViewMutationBody = BodyType<ChatGroupViewInputBody>
+    export type RecordChatGroupViewMutationError = ErrorType<void>
+
+    /**
+ * @summary Record an actual opening of a group; retrying the visit ID is idempotent
+ */
+export const useRecordChatGroupView = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordChatGroupView>>, TError,{id: number;data: BodyType<ChatGroupViewInputBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordChatGroupView>>,
+        TError,
+        {id: number;data: BodyType<ChatGroupViewInputBody>},
+        TContext
+      > => {
+      return useMutation(getRecordChatGroupViewMutationOptions(options));
+    }
 
 export const getUpdateChatGroupTypingUrl = (id: number,) => {
 

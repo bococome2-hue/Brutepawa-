@@ -4,6 +4,7 @@ import { getBpToken } from "../lib/api";
 export interface GroupActivity {
   membersCount: number;
   onlineCount: number;
+  onlineUserIds: number[];
   typing: { userId: number; name: string }[];
 }
 // One lease per browser document, not one per user: closing one tab must not hide another.
@@ -61,6 +62,39 @@ export function usePresenceHeartbeat(authenticated: boolean) {
 export function useGroupActivity(groupId: number | null, text: string) {
   const [snapshot, setSnapshot] = useState<{ groupId: number; activity: GroupActivity } | null>(null);
   const lastTyping = useRef(0);
+  const visit = useRef<{ groupId: number; id: string; done: boolean } | null>(null);
+  useEffect(() => {
+    if (!groupId) { visit.current = null; return; }
+    if (visit.current?.groupId !== groupId) visit.current = { groupId, id: crypto.randomUUID(), done: false };
+    const v = visit.current;
+    let sending = false;
+    const register = async () => {
+      if (v.done || sending || visit.current !== v || document.visibilityState !== "visible" || !navigator.onLine) return;
+      sending = true;
+      try {
+        const token = getBpToken();
+        if (!token) return;
+        const c = new AbortController();
+        const t = setTimeout(() => c.abort(), 8_000);
+        try {
+          const r = await fetch(`${base}/api/chat-groups/${groupId}/views`, {
+            method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ visitId: v.id }), signal: c.signal,
+          });
+          if (r.ok) v.done = true;
+        } finally { clearTimeout(t); }
+      } catch { /* retried on online/visibility */ }
+      finally { sending = false; }
+    };
+    void register();
+    const onVis = () => { void register(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("online", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("online", onVis);
+    };
+  }, [groupId]);
   const notify = (id: number, typing: boolean) => {
     void send(`/chat-groups/${id}/typing`, { typing }).catch(() => {});
   };

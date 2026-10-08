@@ -10,5 +10,6 @@ import type { GetChatGroupActivity200TypingItem } from './getChatGroupActivity20
 export type GetChatGroupActivity200 = {
   membersCount: number;
   onlineCount: number;
+  onlineUserIds: number[];
   typing: GetChatGroupActivity200TypingItem[];
 };

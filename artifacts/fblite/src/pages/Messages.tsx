@@ -11,6 +11,8 @@ import { EmojiPicker } from "../components/EmojiPicker";
 import { useCallSignaling, type NewMessagePayload } from "../hooks/useCallSignaling";
 import { trackEvent } from "../lib/analytics";
 import { useGroupActivity } from "../hooks/useGroupActivity";
+import { useGroupStatistics } from "../hooks/useGroupStatistics";
+import GroupStatisticsPanel from "../components/GroupStatisticsPanel";
 
 void ({} as ApiChatGroup);
 
@@ -716,7 +718,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const [grpMembersData, setGrpMembersData]         = useState<import("../lib/api").ApiChatGroupMembersGrouped | null>(null);
   const grpPriceTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
   const [showGrpStats, setShowGrpStats]             = useState(false);
-  const [grpStatsTab, setGrpStatsTab]               = useState<"stats"|"boosts">("stats");
+  const grpStats = useGroupStatistics(activeGroupId, showGroupInfo || showGrpStats);
   const [showGrpAllActions, setShowGrpAllActions]   = useState(false);
   const [showGrpInfoMuteSheet, setShowGrpInfoMuteSheet] = useState(false);
   /* ─── Group audit log ─── */
@@ -4320,111 +4322,10 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     , document.body);
   }
 
-  /* ── STATISTIQUES / BOOSTS ── */
+  /* ── STATISTIQUES ── */
   if (activeGroupId !== null && showGrpStats) {
     const grp = chatGroups.find(g => g.id === activeGroupId);
-    const memberCount = groupInfo?.members.length ?? grp?.membersCount ?? 0;
-    const today = new Date(); const days = Array.from({length:8},(_,i)=>{const d=new Date(today);d.setDate(d.getDate()-7+i);return d.toLocaleDateString("fr",{month:"short",day:"numeric"});});
-    // Simple SVG line chart
-    const LineChart = ({data, color, height=100}:{data:number[];color:string;height?:number}) => {
-      const mn=Math.min(...data), mx=Math.max(...data)||1;
-      const w=260; const pts=data.map((v,i)=>`${Math.round(i*(w/(data.length-1)))},${Math.round(height-(v-mn)/(mx-mn)*height)}`).join(" ");
-      return <svg width="100%" height={height+20} viewBox={`0 0 ${w} ${height+20}`} preserveAspectRatio="none">
-        <polyline fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pts} />
-      </svg>;
-    };
-    const growthData = [memberCount+30,memberCount+22,memberCount+18,memberCount+14,memberCount+10,memberCount+6,memberCount+3,memberCount];
-    const membData = [4,4,4,5,3,3,2,2];
-    const COLORS = ["#4F9DDE","#5AC05A","#F97316","#E24444","#8B5CF6","#F59E0B","#EC4899","#06B6D4","#84CC16","#6B7280","#F43F5E","#10B981","#A3E635","#FBBF24","#7C3AED","#E879F9","#34D399","#60A5FA"];
-    return createPortal(
-      <div style={{ position:"fixed", inset:0, background:"#F1F5F9", zIndex:10002, display:"flex", flexDirection:"column" }}>
-        {GRP_SUB_HEADER(grp?.name ?? "Groupe", () => setShowGrpStats(false))}
-        {/* Tabs */}
-        <div style={{ background:"#fff", display:"flex", borderBottom:"1px solid rgba(0,0,0,0.07)", flexShrink:0 }}>
-          {[{key:"stats",label:"Statistiques",icon:"📊"},{key:"boosts",label:"Boosts",icon:"⚡"}].map(tab=>(
-            <button key={tab.key} onClick={()=>setGrpStatsTab(tab.key as "stats"|"boosts")}
-              style={{ flex:1, background:"none", border:"none", cursor:"pointer", padding:"12px 0", display:"flex", flexDirection:"column", alignItems:"center", gap:4, borderBottom:grpStatsTab===tab.key?"2.5px solid var(--bp-primary)":"2.5px solid transparent", color:grpStatsTab===tab.key?"var(--bp-primary)":"#9CA3AF", fontWeight:grpStatsTab===tab.key?700:400, fontSize:14, transition:"all 0.15s" }}>
-              <span style={{ fontSize:22 }}>{tab.icon}</span>{tab.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ flex:1, overflowY:"auto", padding:"14px 0 32px" }}>
-          {grpStatsTab === "stats" ? (
-            <>
-              {/* Vue d'ensemble */}
-              <div style={{ background:"#fff", margin:"0 0 10px", padding:"16px 16px 12px" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:14 }}>
-                  <span style={{ fontWeight:700, fontSize:16, color:"#000" }}>Vue d'ensemble</span>
-                  <span style={{ fontSize:12.5, color:"#9CA3AF" }}>{days[0]} — {days[7]}</span>
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                  {[{label:"Membres",val:memberCount,delta:-31,pct:"3.3%"},{label:"Messages",val:1,delta:0,pct:null},{label:"Membres lecteurs",val:162,delta:-189,pct:null},{label:"Membres rédacteurs",val:2,delta:-1,pct:null}].map(s=>(
-                    <div key={s.label}>
-                      <div style={{ fontSize:18, fontWeight:700, color:"#000" }}>
-                        {s.val}
-                        {s.pct&&<span style={{ fontSize:12, fontWeight:600, color:"#EF4444", marginLeft:6 }}>-{s.delta} ({s.pct})</span>}
-                        {!s.pct&&s.delta!==0&&<span style={{ fontSize:12, fontWeight:600, color:"#EF4444", marginLeft:4 }}>{s.delta}</span>}
-                      </div>
-                      <div style={{ fontSize:12.5, color:"#9CA3AF" }}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {/* Croissance */}
-              <div style={{ background:"#fff", margin:"0 0 10px", padding:"16px" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
-                  <span style={{ fontWeight:700, fontSize:15.5, color:"#000" }}>Croissance</span>
-                  <span style={{ fontSize:12.5, color:"#9CA3AF" }}>{days[0]} — {days[7]}</span>
-                </div>
-                <LineChart data={growthData} color="#4F9DDE" height={110} />
-                <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
-                  {[0,2,4,6].map(i=><span key={i} style={{ fontSize:11, color:"#9CA3AF" }}>{days[i]}</span>)}
-                </div>
-              </div>
-              {/* Membres */}
-              <div style={{ background:"#fff", margin:"0 0 10px", padding:"16px" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:10 }}>
-                  <span style={{ fontWeight:700, fontSize:15.5, color:"#000" }}>Membres du groupe</span>
-                  <span style={{ fontSize:12.5, color:"#9CA3AF" }}>{days[0]} — {days[7]}</span>
-                </div>
-                <LineChart data={membData} color="#EF4444" height={100} />
-                <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
-                  {[0,2,4,6].map(i=><span key={i} style={{ fontSize:11, color:"#9CA3AF" }}>{days[i]}</span>)}
-                </div>
-              </div>
-            </>
-          ) : (
-            /* BOOSTS TAB */
-            <>
-              <div style={{ background:"#fff", padding:"20px 16px 14px", textAlign:"center", marginBottom:10 }}>
-                <div style={{ fontSize:13, color:"#9CA3AF", marginBottom:14 }}>Le groupe a 0 boost. <span style={{ color:"var(--bp-primary)", fontWeight:600 }}>Que sont les boosts ?</span></div>
-                {/* Color palette */}
-                <div style={{ display:"flex", flexWrap:"wrap", gap:10, justifyContent:"center", marginBottom:16 }}>
-                  {COLORS.map((c,i)=>(
-                    <div key={i} style={{ width:34, height:34, borderRadius:"50%", background:i>=9?`linear-gradient(135deg,${c},${COLORS[(i+4)%COLORS.length]})`:c, border:"2px solid transparent" }} />
-                  ))}
-                </div>
-              </div>
-              {[{label:"Logo de profil",level:"Niveau 5"},{label:"Lot d'emoji du groupe",level:"Niveau 4"},{label:"Statut emoji du groupe",level:"Niveau 8"}].map(item=>(
-                <div key={item.label} style={{ background:"#fff", margin:"0 0 6px", padding:"14px 16px" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
-                    <span style={{ flex:1, fontSize:15.5, color:"#000", fontWeight:500 }}>{item.label}</span>
-                    <span style={{ fontSize:11, fontWeight:700, color:"#fff", background:"#8B5CF6", borderRadius:12, padding:"2px 8px" }}>{item.level}</span>
-                    <span style={{ fontSize:14, color:"#9CA3AF", fontWeight:500 }}>Désactivé</span>
-                  </div>
-                  <p style={{ fontSize:12.5, color:"#9CA3AF", margin:0, lineHeight:1.5 }}>
-                    {item.label==="Logo de profil"?"Choisissez une couleur et un logo pour le profil du groupe.":item.label==="Lot d'emoji du groupe"?"Choisissez un lot d'emoji qui sera disponible pour tous les membres du groupe.":"Choisissez un statut qui sera affiché à côté du nom du groupe."}
-                  </p>
-                </div>
-              ))}
-              <div style={{ padding:"0 16px" }}>
-                <button style={{ width:"100%", background:"var(--bp-primary)", color:"#fff", border:"none", borderRadius:24, padding:"15px 0", fontSize:16, fontWeight:700, cursor:"pointer", marginTop:8 }}>Appliquer</button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    , document.body);
+    return <GroupStatisticsPanel title={grp?.name ?? "Groupe"} data={grpStats.data} loading={grpStats.loading} error={grpStats.error} onRetry={grpStats.reload} onClose={() => setShowGrpStats(false)} />;
   }
 
   if (activeGroupId !== null && showGroupInfo && showGrpEdit) {
@@ -5167,11 +5068,11 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
                   <div style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 16px", background:menuOpen?"rgba(0,0,0,0.02)":"transparent" }}>
                     <div style={{ position:"relative", flexShrink:0 }}>
                       <div style={{ width:46, height:46, borderRadius:"50%", background:avatarColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:16 }}>{mkInitials(name)}</div>
-                      <div style={{ position:"absolute", bottom:1, right:1, width:13, height:13, borderRadius:"50%", background:"#22C55E", border:"2px solid var(--theme-surface)" }} />
+                      {groupActivity && <div style={{ position:"absolute", bottom:1, right:1, width:13, height:13, borderRadius:"50%", background:groupActivity.onlineUserIds.includes(m.userId)?"#22C55E":"#9CA3AF", border:"2px solid var(--theme-surface)" }} />}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontWeight:600, fontSize:15.5, color:"#000", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{name}</div>
-                      <div style={{ fontSize:12.5, color:"var(--bp-primary)", marginTop:1 }}>{isMe?"Vous":"en ligne"}</div>
+                      <div style={{ fontSize:12.5, color:groupActivity?.onlineUserIds.includes(m.userId)?"var(--bp-primary)":"#9CA3AF", marginTop:1 }}>{isMe?"Vous":!groupActivity?"Statut inconnu":groupActivity.onlineUserIds.includes(m.userId)?"en ligne":"hors ligne"}</div>
                     </div>
                     {roleLabel && (
                       <div style={{ fontSize:12, color:"var(--bp-primary)", border:"1.5px solid var(--bp-primary)", borderRadius:20, padding:"3px 10px", flexShrink:0, fontWeight:500, background:"var(--theme-surface)", whiteSpace:"nowrap" }}>{roleLabel}</div>
@@ -5219,18 +5120,18 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
               </div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:15.5, color:"#3B82F6", fontWeight:600 }}>Statistiques du groupe</div>
-                <div style={{ fontSize:12.5, color:"#9CA3AF", marginTop:1 }}>Voir les statistiques de croissance et d'activité</div>
+                <div style={{ fontSize:12.5, color:"#9CA3AF", marginTop:1 }}>{grpStats.error ? "Statistiques indisponibles" : "Voir les statistiques du groupe"}</div>
               </div>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#CBD5E1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
             </div>
             {/* 4 stats grid */}
             <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", padding:"16px 6px 14px", gap:2 }}>
               {([
-                { icon:<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>, val:12,          label:"Messages aujourd'hui", sub:null },
-                { icon:<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, val:memberCount, label:"Membres total",         sub:null },
-                { icon:<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>, val:15,          label:"Vues",                  sub:"7 derniers jours" },
-                { icon:<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>, val:3,           label:"Réactions",             sub:"7 derniers jours" },
-              ] as {icon:React.ReactNode;val:number;label:string;sub:string|null}[]).map(s => (
+                { icon:<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>, val:grpStats.data?grpStats.data.messagesToday:"–", label:"Messages aujourd'hui", sub:null },
+                { icon:<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, val:grpStats.data?grpStats.data.membersTotal:"–", label:"Membres total",         sub:null },
+                { icon:<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>, val:grpStats.data?grpStats.data.viewsLast7Days:"–", label:"Vues",                  sub:"7 derniers jours" },
+                { icon:<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#F97316" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>, val:"–", label:"Réactions", sub:"Non suivies" },
+              ] as {icon:React.ReactNode;val:number|string;label:string;sub:string|null}[]).map(s => (
                 <div key={s.label} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"2px 2px" }}>
                   {s.icon}
                   <div style={{ fontWeight:700, fontSize:20, color:"#000", lineHeight:1.2 }}>{s.val}</div>
@@ -5250,7 +5151,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
               </div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:15.5, color:"#22C55E", fontWeight:600 }}>Activité récente</div>
-                <div style={{ fontSize:12.5, color:"#9CA3AF", marginTop:1 }}>Groupe actif • Réponse rapide • Bonne engagement</div>
+                <div style={{ fontSize:12.5, color:"#9CA3AF", marginTop:1 }}>{grpStats.data ? `${grpStats.data.messagesLast7Days} messages sur 7 jours · ${grpStats.data.lastMessageAt ? "dernier : " + new Date(grpStats.data.lastMessageAt).toLocaleString("fr",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "aucun message"}` : grpStats.error ? "Statistiques indisponibles" : "Chargement…"}</div>
               </div>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#CBD5E1" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
             </div>

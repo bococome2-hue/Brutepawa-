@@ -121,10 +121,11 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [membersCount, onlineCount, typing]
+                required: [membersCount, onlineCount, onlineUserIds, typing]
                 properties:
                   membersCount: { type: integer }
                   onlineCount: { type: integer }
+                  onlineUserIds: { type: array, items: { type: integer } }
                   typing:
                     type: array
                     items:
@@ -134,6 +135,44 @@ paths:
                         userId: { type: integer }
                         name: { type: string }
         "400": { description: Invalid group }
+        "401": { description: Authentication required }
+        "403": { description: Group membership required }
+  /chat-groups/{id}/statistics:
+    get:
+      operationId: getChatGroupStatistics
+      tags: [social]
+      summary: Real persisted group statistics for seven local calendar days
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: timezone
+          schema: { type: string, default: UTC }
+      responses:
+        "200":
+          description: Counts from the database; unavailable reaction tracking is null
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatGroupStatistics" }
+        "400": { description: Invalid group or timezone }
+        "401": { description: Authentication required }
+        "403": { description: Group membership required }
+  /chat-groups/{id}/views:
+    post:
+      operationId: recordChatGroupView
+      tags: [social]
+      summary: Record an actual opening of a group; retrying the visit ID is idempotent
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody: { $ref: "#/components/requestBodies/ChatGroupViewInput" }
+      responses:
+        "204": { description: Opening recorded or already recorded }
+        "400": { description: Invalid visit ID }
         "401": { description: Authentication required }
         "403": { description: Group membership required }
   /chat-groups/{id}/typing:
@@ -1063,7 +1102,55 @@ paths:
                 $ref: "#/components/schemas/User"
 
 components:
+  requestBodies:
+    ChatGroupViewInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ChatGroupView"
   schemas:
+    ChatGroupView:
+      type: object
+      required: [visitId]
+      properties:
+        visitId: { type: string, format: uuid }
+    ChatGroupStatistics:
+      type: object
+      required: [groupId, timeZone, periodStart, periodEnd, membersTotal, messagesToday, messagesLast7Days, writersLast7Days, viewsLast7Days, readersLast7Days, reactionsLast7Days, lastMessageAt, daily, recentActivity, viewDefinition]
+      properties:
+        groupId: { type: integer }
+        timeZone: { type: string }
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+        membersTotal: { type: integer }
+        messagesToday: { type: integer }
+        messagesLast7Days: { type: integer }
+        writersLast7Days: { type: integer }
+        viewsLast7Days: { type: integer }
+        readersLast7Days: { type: integer }
+        reactionsLast7Days: { type: integer, nullable: true }
+        lastMessageAt: { type: string, format: date-time, nullable: true }
+        viewDefinition: { type: string }
+        daily:
+          type: array
+          items:
+            type: object
+            required: [day, messages, views]
+            properties:
+              day: { type: string, format: date }
+              messages: { type: integer }
+              views: { type: integer }
+        recentActivity:
+          type: array
+          items:
+            type: object
+            required: [id, name, type, createdAt]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              type: { type: string, enum: [text, system] }
+              createdAt: { type: string, format: date-time }
     ChatBotSettings:
       type: object
       additionalProperties: false
