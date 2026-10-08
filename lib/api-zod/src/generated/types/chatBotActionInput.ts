@@ -15,9 +15,11 @@ export interface ChatBotActionInput {
   messageId?: number;
   /**
      * @minimum 1
-     * @maximum 1440
+     * @maximum 43200
      */
   durationMinutes?: number;
   /** @maxLength 500 */
   reason?: string;
+  /** Reuse the same UUID when retrying an action */
+  requestId?: string;
 }

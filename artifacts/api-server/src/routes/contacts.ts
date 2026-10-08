@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { addChatMember, BotError } from "../lib/chatBot";
 import { sql, eq, and, or, desc, ilike } from "drizzle-orm";
 import {
   db, usersTable, friendRequestsTable, friendshipsTable,
@@ -400,9 +401,9 @@ router.get("/contacts/me/groups", requireAuth, async (req, res): Promise<void> =
 ───────────────────────────────────────────────────────────── */
 router.post("/contacts/:userId/add-to-group/:groupId", requireAuth, async (req, res): Promise<void> => {
   const myId    = req.userId!;
-  const userId  = parseInt(req.params.userId, 10);
-  const groupId = parseInt(req.params.groupId, 10);
-  if (isNaN(userId) || isNaN(groupId)) { res.status(400).json({ error: "Invalid params" }); return; }
+  const userId  = Number(req.params.userId);
+  const groupId = Number(req.params.groupId);
+  if (!Number.isSafeInteger(userId) || userId < 1 || !Number.isSafeInteger(groupId) || groupId < 1) { res.status(400).json({ error: "Invalid params" }); return; }
 
   const [membership] = await db.select().from(chatGroupMembersTable)
     .where(and(eq(chatGroupMembersTable.groupId, groupId), eq(chatGroupMembersTable.userId, myId)));
@@ -410,7 +411,12 @@ router.post("/contacts/:userId/add-to-group/:groupId", requireAuth, async (req, 
     res.status(403).json({ error: "Non autorisé" }); return;
   }
 
-  await db.insert(chatGroupMembersTable).values({ groupId, userId, role: "member" }).catch(() => {});
+  try {
+    await addChatMember(groupId, userId, myId);
+  } catch (error) {
+    if (!(error instanceof BotError)) throw error;
+    res.status(error.status).json({ error: error.message }); return;
+  }
   res.json({ ok: true });
 });
 

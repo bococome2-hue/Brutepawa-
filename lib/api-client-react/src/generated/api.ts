@@ -27,6 +27,7 @@ import type {
   ChatBotActionInput,
   ChatBotSettings,
   ChatBotState,
+  ChatBotStatistics,
   ChatGroupStatistics,
   ChatGroupTypingInput,
   ChatGroupViewInputBody,
@@ -38,6 +39,8 @@ import type {
   DepositInput,
   EnrollInput,
   Enrollment,
+  GetChatBotProfile200,
+  GetChatBotStatisticsParams,
   GetChatGroupActivity200,
   GetChatGroupStatisticsParams,
   HealthStatus,
@@ -89,6 +92,224 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export const getGetChatBotProfileUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat-groups/${id}/bot/profile`
+}
+
+export const getChatBotProfile = async (id: number, options?: RequestInit): Promise<GetChatBotProfile200> => {
+
+  return customFetch<GetChatBotProfile200>(getGetChatBotProfileUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChatBotProfileQueryKey = (id: number,) => {
+    return [
+    `/api/chat-groups/${id}/bot/profile`
+    ] as const;
+    }
+
+
+export const getGetChatBotProfileQueryOptions = <TData = Awaited<ReturnType<typeof getChatBotProfile>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatBotProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChatBotProfileQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChatBotProfile>>> = ({ signal }) => getChatBotProfile(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChatBotProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChatBotProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getChatBotProfile>>>
+export type GetChatBotProfileQueryError = ErrorType<void>
+
+
+
+export function useGetChatBotProfile<TData = Awaited<ReturnType<typeof getChatBotProfile>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatBotProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChatBotProfileQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getVerifyChatBotMemberUrl = (id: number,) => {
+
+
+
+
+  return `/api/chat-groups/${id}/bot/verify`
+}
+
+export const verifyChatBotMember = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getVerifyChatBotMemberUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getVerifyChatBotMemberMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyChatBotMember>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyChatBotMember>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['verifyChatBotMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyChatBotMember>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  verifyChatBotMember(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyChatBotMemberMutationResult = NonNullable<Awaited<ReturnType<typeof verifyChatBotMember>>>
+
+    export type VerifyChatBotMemberMutationError = ErrorType<void>
+
+    export const useVerifyChatBotMember = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyChatBotMember>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyChatBotMember>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getVerifyChatBotMemberMutationOptions(options));
+    }
+
+export const getGetChatBotStatisticsUrl = (id: number,
+    params?: GetChatBotStatisticsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/chat-groups/${id}/bot/statistics?${stringifiedParams}` : `/api/chat-groups/${id}/bot/statistics`
+}
+
+export const getChatBotStatistics = async (id: number,
+    params?: GetChatBotStatisticsParams, options?: RequestInit): Promise<ChatBotStatistics> => {
+
+  return customFetch<ChatBotStatistics>(getGetChatBotStatisticsUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChatBotStatisticsQueryKey = (id: number,
+    params?: GetChatBotStatisticsParams,) => {
+    return [
+    `/api/chat-groups/${id}/bot/statistics`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetChatBotStatisticsQueryOptions = <TData = Awaited<ReturnType<typeof getChatBotStatistics>>, TError = ErrorType<void>>(id: number,
+    params?: GetChatBotStatisticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatBotStatistics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChatBotStatisticsQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChatBotStatistics>>> = ({ signal }) => getChatBotStatistics(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChatBotStatistics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChatBotStatisticsQueryResult = NonNullable<Awaited<ReturnType<typeof getChatBotStatistics>>>
+export type GetChatBotStatisticsQueryError = ErrorType<void>
+
+
+
+export function useGetChatBotStatistics<TData = Awaited<ReturnType<typeof getChatBotStatistics>>, TError = ErrorType<void>>(
+ id: number,
+    params?: GetChatBotStatisticsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChatBotStatistics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChatBotStatisticsQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
 
 
 

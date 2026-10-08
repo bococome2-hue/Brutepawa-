@@ -5,10 +5,46 @@
  * AfriConnect API - Super-app for West Africa
  * OpenAPI spec version: 0.1.0
  */
+import type { ChatBotPermissions } from './chatBotPermissions';
+import type { ChatBotSettingsFinalSanction } from './chatBotSettingsFinalSanction';
+import type { ChatBotSettingsViolationAction } from './chatBotSettingsViolationAction';
 
 export interface ChatBotSettings {
   enabled: boolean;
   antiSpam: boolean;
+  antiFlood?: boolean;
+  /**
+     * @minimum 2
+     * @maximum 10
+     */
+  duplicateThreshold?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  maxMedia?: number;
+  /**
+     * @minimum 2
+     * @maximum 100
+     */
+  maxMentions?: number;
+  wordFilter?: boolean;
+  newMemberProtection?: boolean;
+  /**
+     * @minimum 1
+     * @maximum 1440
+     */
+  protectionMinutes?: number;
+  verificationEnabled?: boolean;
+  /**
+     * @minimum 1
+     * @maximum 60
+     */
+  verificationMinutes?: number;
+  welcomeEnabled?: boolean;
+  violationAction?: ChatBotSettingsViolationAction;
+  finalSanction?: ChatBotSettingsFinalSanction;
+  permissions?: ChatBotPermissions;
   /**
      * @minimum 2
      * @maximum 30
@@ -44,7 +80,7 @@ export interface ChatBotSettings {
   warnBeforeBan: number;
   /**
      * @minimum 1
-     * @maximum 1440
+     * @maximum 43200
      */
   muteMinutes: number;
   /** @maxLength 2000 */

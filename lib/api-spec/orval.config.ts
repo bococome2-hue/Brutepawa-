@@ -60,6 +60,7 @@ export default defineConfig({
           // Path + query parameters otherwise both export the same *Params name.
           // This route validates its path ID explicitly on the server.
           getChatGroupStatistics: { zod: { generate: { param: false } } },
+          getChatBotStatistics: { zod: { generate: { param: false } } },
         },
         zod: {
           coerce: {

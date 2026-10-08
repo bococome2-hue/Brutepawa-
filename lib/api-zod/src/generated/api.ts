@@ -8,6 +8,51 @@
 import * as zod from 'zod';
 
 
+export const GetChatBotProfileParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetChatBotProfileResponse = zod.object({
+  "name": zod.string(),
+  "handle": zod.string(),
+  "official": zod.boolean(),
+  "enabled": zod.boolean(),
+  "description": zod.string(),
+  "pendingVerification": zod.boolean(),
+  "verificationExpiresAt": zod.coerce.date().nullish()
+})
+
+
+export const VerifyChatBotMemberParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const VerifyChatBotMemberResponse = zod.void()
+
+
+export const getChatBotStatisticsQueryPeriodDefault = `seven`;
+
+export const GetChatBotStatisticsQueryParams = zod.object({
+  "period": zod.enum(['today', 'seven', 'thirty', 'total']).default(getChatBotStatisticsQueryPeriodDefault)
+})
+
+export const GetChatBotStatisticsResponse = zod.object({
+  "period": zod.string(),
+  "timeZone": zod.string(),
+  "trackingSince": zod.date().nullable(),
+  "analyzed": zod.number(),
+  "deleted": zod.number(),
+  "blocked": zod.number(),
+  "spam": zod.number(),
+  "links": zod.number(),
+  "warnings": zod.number(),
+  "mutes": zod.number(),
+  "kicks": zod.number(),
+  "bans": zod.number(),
+  "protectedUsers": zod.number()
+})
+
+
 /**
  * @summary Read chat moderation configuration, sanctions and recent history (admins only)
  */
@@ -18,6 +63,41 @@ export const GetChatBotParams = zod.object({
   "id": zod.coerce.number().min(1)
 })
 
+export const getChatBotResponseSettingsAntiFloodDefault = true;
+export const getChatBotResponseSettingsDuplicateThresholdDefault = 3;
+export const getChatBotResponseSettingsDuplicateThresholdMin = 2;
+export const getChatBotResponseSettingsDuplicateThresholdMax = 10;
+
+export const getChatBotResponseSettingsMaxMediaDefault = 3;
+export const getChatBotResponseSettingsMaxMediaMax = 30;
+
+export const getChatBotResponseSettingsMaxMentionsDefault = 8;
+export const getChatBotResponseSettingsMaxMentionsMin = 2;
+export const getChatBotResponseSettingsMaxMentionsMax = 100;
+
+export const getChatBotResponseSettingsWordFilterDefault = true;
+export const getChatBotResponseSettingsNewMemberProtectionDefault = false;
+export const getChatBotResponseSettingsProtectionMinutesDefault = 10;
+export const getChatBotResponseSettingsProtectionMinutesMax = 1440;
+
+export const getChatBotResponseSettingsVerificationEnabledDefault = false;
+export const getChatBotResponseSettingsVerificationMinutesDefault = 10;
+export const getChatBotResponseSettingsVerificationMinutesMax = 60;
+
+export const getChatBotResponseSettingsWelcomeEnabledDefault = true;
+export const getChatBotResponseSettingsViolationActionDefault = `warn`;
+export const getChatBotResponseSettingsFinalSanctionDefault = `mute`;
+export const getChatBotResponseSettingsPermissionsDeleteMessagesDefault = true;
+export const getChatBotResponseSettingsPermissionsDeleteMediaDefault = true;
+export const getChatBotResponseSettingsPermissionsDeleteLinksDefault = true;
+export const getChatBotResponseSettingsPermissionsWarnDefault = true;
+export const getChatBotResponseSettingsPermissionsMuteDefault = true;
+export const getChatBotResponseSettingsPermissionsKickDefault = false;
+export const getChatBotResponseSettingsPermissionsBanDefault = false;
+export const getChatBotResponseSettingsPermissionsUnbanDefault = false;
+export const getChatBotResponseSettingsPermissionsViewLogsDefault = true;
+export const getChatBotResponseSettingsPermissionsViewStatsDefault = true;
+export const getChatBotResponseSettingsPermissionsManageSettingsDefault = true;
 export const getChatBotResponseSettingsMaxMessagesMin = 2;
 export const getChatBotResponseSettingsMaxMessagesMax = 30;
 
@@ -37,7 +117,7 @@ export const getChatBotResponseSettingsWarnBeforeMuteMax = 10;
 export const getChatBotResponseSettingsWarnBeforeBanMin = 2;
 export const getChatBotResponseSettingsWarnBeforeBanMax = 30;
 
-export const getChatBotResponseSettingsMuteMinutesMax = 1440;
+export const getChatBotResponseSettingsMuteMinutesMax = 43200;
 
 export const getChatBotResponseSettingsRulesMax = 2000;
 
@@ -46,9 +126,41 @@ export const getChatBotResponseSettingsWelcomeMessageMax = 1000;
 
 
 export const GetChatBotResponse = zod.object({
+  "myRole": zod.enum(['owner', 'admin']).optional(),
+  "profile": zod.object({
+  "name": zod.string().optional(),
+  "handle": zod.string().optional(),
+  "official": zod.boolean().optional(),
+  "description": zod.string().optional()
+}).optional(),
   "settings": zod.object({
   "enabled": zod.boolean(),
   "antiSpam": zod.boolean(),
+  "antiFlood": zod.boolean().default(getChatBotResponseSettingsAntiFloodDefault),
+  "duplicateThreshold": zod.number().min(getChatBotResponseSettingsDuplicateThresholdMin).max(getChatBotResponseSettingsDuplicateThresholdMax).default(getChatBotResponseSettingsDuplicateThresholdDefault),
+  "maxMedia": zod.number().min(1).max(getChatBotResponseSettingsMaxMediaMax).default(getChatBotResponseSettingsMaxMediaDefault),
+  "maxMentions": zod.number().min(getChatBotResponseSettingsMaxMentionsMin).max(getChatBotResponseSettingsMaxMentionsMax).default(getChatBotResponseSettingsMaxMentionsDefault),
+  "wordFilter": zod.boolean().default(getChatBotResponseSettingsWordFilterDefault),
+  "newMemberProtection": zod.boolean().default(getChatBotResponseSettingsNewMemberProtectionDefault),
+  "protectionMinutes": zod.number().min(1).max(getChatBotResponseSettingsProtectionMinutesMax).default(getChatBotResponseSettingsProtectionMinutesDefault),
+  "verificationEnabled": zod.boolean().default(getChatBotResponseSettingsVerificationEnabledDefault),
+  "verificationMinutes": zod.number().min(1).max(getChatBotResponseSettingsVerificationMinutesMax).default(getChatBotResponseSettingsVerificationMinutesDefault),
+  "welcomeEnabled": zod.boolean().default(getChatBotResponseSettingsWelcomeEnabledDefault),
+  "violationAction": zod.enum(['delete', 'warn', 'mute', 'kick', 'ban']).default(getChatBotResponseSettingsViolationActionDefault),
+  "finalSanction": zod.enum(['mute', 'kick', 'ban']).default(getChatBotResponseSettingsFinalSanctionDefault),
+  "permissions": zod.object({
+  "deleteMessages": zod.boolean().default(getChatBotResponseSettingsPermissionsDeleteMessagesDefault),
+  "deleteMedia": zod.boolean().default(getChatBotResponseSettingsPermissionsDeleteMediaDefault),
+  "deleteLinks": zod.boolean().default(getChatBotResponseSettingsPermissionsDeleteLinksDefault),
+  "warn": zod.boolean().default(getChatBotResponseSettingsPermissionsWarnDefault),
+  "mute": zod.boolean().default(getChatBotResponseSettingsPermissionsMuteDefault),
+  "kick": zod.boolean().default(getChatBotResponseSettingsPermissionsKickDefault),
+  "ban": zod.boolean().default(getChatBotResponseSettingsPermissionsBanDefault),
+  "unban": zod.boolean().default(getChatBotResponseSettingsPermissionsUnbanDefault),
+  "viewLogs": zod.boolean().default(getChatBotResponseSettingsPermissionsViewLogsDefault),
+  "viewStats": zod.boolean().default(getChatBotResponseSettingsPermissionsViewStatsDefault),
+  "manageSettings": zod.boolean().default(getChatBotResponseSettingsPermissionsManageSettingsDefault)
+}).optional(),
   "maxMessages": zod.number().min(getChatBotResponseSettingsMaxMessagesMin).max(getChatBotResponseSettingsMaxMessagesMax),
   "windowSeconds": zod.number().min(getChatBotResponseSettingsWindowSecondsMin).max(getChatBotResponseSettingsWindowSecondsMax),
   "blockLinks": zod.boolean(),
@@ -66,14 +178,18 @@ export const GetChatBotResponse = zod.object({
   "targetUserId": zod.number().nullable(),
   "actorId": zod.number().nullable(),
   "detail": zod.string(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "messageId": zod.number().nullish(),
+  "expiresAt": zod.coerce.date().nullish(),
+  "metadata": zod.record(zod.string(), zod.unknown()).optional()
 })),
   "sanctions": zod.array(zod.object({
   "userId": zod.number(),
   "name": zod.string(),
   "warnings": zod.number(),
   "mutedUntil": zod.coerce.date().nullable(),
-  "banned": zod.boolean()
+  "banned": zod.boolean(),
+  "verificationUntil": zod.coerce.date().nullish()
 })),
   "members": zod.array(zod.object({
   "userId": zod.number(),
@@ -93,6 +209,41 @@ export const UpdateChatBotParams = zod.object({
   "id": zod.coerce.number().min(1)
 })
 
+export const updateChatBotBodyAntiFloodDefault = true;
+export const updateChatBotBodyDuplicateThresholdDefault = 3;
+export const updateChatBotBodyDuplicateThresholdMin = 2;
+export const updateChatBotBodyDuplicateThresholdMax = 10;
+
+export const updateChatBotBodyMaxMediaDefault = 3;
+export const updateChatBotBodyMaxMediaMax = 30;
+
+export const updateChatBotBodyMaxMentionsDefault = 8;
+export const updateChatBotBodyMaxMentionsMin = 2;
+export const updateChatBotBodyMaxMentionsMax = 100;
+
+export const updateChatBotBodyWordFilterDefault = true;
+export const updateChatBotBodyNewMemberProtectionDefault = false;
+export const updateChatBotBodyProtectionMinutesDefault = 10;
+export const updateChatBotBodyProtectionMinutesMax = 1440;
+
+export const updateChatBotBodyVerificationEnabledDefault = false;
+export const updateChatBotBodyVerificationMinutesDefault = 10;
+export const updateChatBotBodyVerificationMinutesMax = 60;
+
+export const updateChatBotBodyWelcomeEnabledDefault = true;
+export const updateChatBotBodyViolationActionDefault = `warn`;
+export const updateChatBotBodyFinalSanctionDefault = `mute`;
+export const updateChatBotBodyPermissionsDeleteMessagesDefault = true;
+export const updateChatBotBodyPermissionsDeleteMediaDefault = true;
+export const updateChatBotBodyPermissionsDeleteLinksDefault = true;
+export const updateChatBotBodyPermissionsWarnDefault = true;
+export const updateChatBotBodyPermissionsMuteDefault = true;
+export const updateChatBotBodyPermissionsKickDefault = false;
+export const updateChatBotBodyPermissionsBanDefault = false;
+export const updateChatBotBodyPermissionsUnbanDefault = false;
+export const updateChatBotBodyPermissionsViewLogsDefault = true;
+export const updateChatBotBodyPermissionsViewStatsDefault = true;
+export const updateChatBotBodyPermissionsManageSettingsDefault = true;
 export const updateChatBotBodyMaxMessagesMin = 2;
 export const updateChatBotBodyMaxMessagesMax = 30;
 
@@ -112,7 +263,7 @@ export const updateChatBotBodyWarnBeforeMuteMax = 10;
 export const updateChatBotBodyWarnBeforeBanMin = 2;
 export const updateChatBotBodyWarnBeforeBanMax = 30;
 
-export const updateChatBotBodyMuteMinutesMax = 1440;
+export const updateChatBotBodyMuteMinutesMax = 43200;
 
 export const updateChatBotBodyRulesMax = 2000;
 
@@ -123,6 +274,31 @@ export const updateChatBotBodyWelcomeMessageMax = 1000;
 export const UpdateChatBotBody = zod.object({
   "enabled": zod.boolean(),
   "antiSpam": zod.boolean(),
+  "antiFlood": zod.boolean().default(updateChatBotBodyAntiFloodDefault),
+  "duplicateThreshold": zod.number().min(updateChatBotBodyDuplicateThresholdMin).max(updateChatBotBodyDuplicateThresholdMax).default(updateChatBotBodyDuplicateThresholdDefault),
+  "maxMedia": zod.number().min(1).max(updateChatBotBodyMaxMediaMax).default(updateChatBotBodyMaxMediaDefault),
+  "maxMentions": zod.number().min(updateChatBotBodyMaxMentionsMin).max(updateChatBotBodyMaxMentionsMax).default(updateChatBotBodyMaxMentionsDefault),
+  "wordFilter": zod.boolean().default(updateChatBotBodyWordFilterDefault),
+  "newMemberProtection": zod.boolean().default(updateChatBotBodyNewMemberProtectionDefault),
+  "protectionMinutes": zod.number().min(1).max(updateChatBotBodyProtectionMinutesMax).default(updateChatBotBodyProtectionMinutesDefault),
+  "verificationEnabled": zod.boolean().default(updateChatBotBodyVerificationEnabledDefault),
+  "verificationMinutes": zod.number().min(1).max(updateChatBotBodyVerificationMinutesMax).default(updateChatBotBodyVerificationMinutesDefault),
+  "welcomeEnabled": zod.boolean().default(updateChatBotBodyWelcomeEnabledDefault),
+  "violationAction": zod.enum(['delete', 'warn', 'mute', 'kick', 'ban']).default(updateChatBotBodyViolationActionDefault),
+  "finalSanction": zod.enum(['mute', 'kick', 'ban']).default(updateChatBotBodyFinalSanctionDefault),
+  "permissions": zod.object({
+  "deleteMessages": zod.boolean().default(updateChatBotBodyPermissionsDeleteMessagesDefault),
+  "deleteMedia": zod.boolean().default(updateChatBotBodyPermissionsDeleteMediaDefault),
+  "deleteLinks": zod.boolean().default(updateChatBotBodyPermissionsDeleteLinksDefault),
+  "warn": zod.boolean().default(updateChatBotBodyPermissionsWarnDefault),
+  "mute": zod.boolean().default(updateChatBotBodyPermissionsMuteDefault),
+  "kick": zod.boolean().default(updateChatBotBodyPermissionsKickDefault),
+  "ban": zod.boolean().default(updateChatBotBodyPermissionsBanDefault),
+  "unban": zod.boolean().default(updateChatBotBodyPermissionsUnbanDefault),
+  "viewLogs": zod.boolean().default(updateChatBotBodyPermissionsViewLogsDefault),
+  "viewStats": zod.boolean().default(updateChatBotBodyPermissionsViewStatsDefault),
+  "manageSettings": zod.boolean().default(updateChatBotBodyPermissionsManageSettingsDefault)
+}).optional(),
   "maxMessages": zod.number().min(updateChatBotBodyMaxMessagesMin).max(updateChatBotBodyMaxMessagesMax),
   "windowSeconds": zod.number().min(updateChatBotBodyWindowSecondsMin).max(updateChatBotBodyWindowSecondsMax),
   "blockLinks": zod.boolean(),
@@ -135,6 +311,41 @@ export const UpdateChatBotBody = zod.object({
   "welcomeMessage": zod.string().max(updateChatBotBodyWelcomeMessageMax)
 })
 
+export const updateChatBotResponseSettingsAntiFloodDefault = true;
+export const updateChatBotResponseSettingsDuplicateThresholdDefault = 3;
+export const updateChatBotResponseSettingsDuplicateThresholdMin = 2;
+export const updateChatBotResponseSettingsDuplicateThresholdMax = 10;
+
+export const updateChatBotResponseSettingsMaxMediaDefault = 3;
+export const updateChatBotResponseSettingsMaxMediaMax = 30;
+
+export const updateChatBotResponseSettingsMaxMentionsDefault = 8;
+export const updateChatBotResponseSettingsMaxMentionsMin = 2;
+export const updateChatBotResponseSettingsMaxMentionsMax = 100;
+
+export const updateChatBotResponseSettingsWordFilterDefault = true;
+export const updateChatBotResponseSettingsNewMemberProtectionDefault = false;
+export const updateChatBotResponseSettingsProtectionMinutesDefault = 10;
+export const updateChatBotResponseSettingsProtectionMinutesMax = 1440;
+
+export const updateChatBotResponseSettingsVerificationEnabledDefault = false;
+export const updateChatBotResponseSettingsVerificationMinutesDefault = 10;
+export const updateChatBotResponseSettingsVerificationMinutesMax = 60;
+
+export const updateChatBotResponseSettingsWelcomeEnabledDefault = true;
+export const updateChatBotResponseSettingsViolationActionDefault = `warn`;
+export const updateChatBotResponseSettingsFinalSanctionDefault = `mute`;
+export const updateChatBotResponseSettingsPermissionsDeleteMessagesDefault = true;
+export const updateChatBotResponseSettingsPermissionsDeleteMediaDefault = true;
+export const updateChatBotResponseSettingsPermissionsDeleteLinksDefault = true;
+export const updateChatBotResponseSettingsPermissionsWarnDefault = true;
+export const updateChatBotResponseSettingsPermissionsMuteDefault = true;
+export const updateChatBotResponseSettingsPermissionsKickDefault = false;
+export const updateChatBotResponseSettingsPermissionsBanDefault = false;
+export const updateChatBotResponseSettingsPermissionsUnbanDefault = false;
+export const updateChatBotResponseSettingsPermissionsViewLogsDefault = true;
+export const updateChatBotResponseSettingsPermissionsViewStatsDefault = true;
+export const updateChatBotResponseSettingsPermissionsManageSettingsDefault = true;
 export const updateChatBotResponseSettingsMaxMessagesMin = 2;
 export const updateChatBotResponseSettingsMaxMessagesMax = 30;
 
@@ -154,7 +365,7 @@ export const updateChatBotResponseSettingsWarnBeforeMuteMax = 10;
 export const updateChatBotResponseSettingsWarnBeforeBanMin = 2;
 export const updateChatBotResponseSettingsWarnBeforeBanMax = 30;
 
-export const updateChatBotResponseSettingsMuteMinutesMax = 1440;
+export const updateChatBotResponseSettingsMuteMinutesMax = 43200;
 
 export const updateChatBotResponseSettingsRulesMax = 2000;
 
@@ -166,6 +377,31 @@ export const UpdateChatBotResponse = zod.object({
   "settings": zod.object({
   "enabled": zod.boolean(),
   "antiSpam": zod.boolean(),
+  "antiFlood": zod.boolean().default(updateChatBotResponseSettingsAntiFloodDefault),
+  "duplicateThreshold": zod.number().min(updateChatBotResponseSettingsDuplicateThresholdMin).max(updateChatBotResponseSettingsDuplicateThresholdMax).default(updateChatBotResponseSettingsDuplicateThresholdDefault),
+  "maxMedia": zod.number().min(1).max(updateChatBotResponseSettingsMaxMediaMax).default(updateChatBotResponseSettingsMaxMediaDefault),
+  "maxMentions": zod.number().min(updateChatBotResponseSettingsMaxMentionsMin).max(updateChatBotResponseSettingsMaxMentionsMax).default(updateChatBotResponseSettingsMaxMentionsDefault),
+  "wordFilter": zod.boolean().default(updateChatBotResponseSettingsWordFilterDefault),
+  "newMemberProtection": zod.boolean().default(updateChatBotResponseSettingsNewMemberProtectionDefault),
+  "protectionMinutes": zod.number().min(1).max(updateChatBotResponseSettingsProtectionMinutesMax).default(updateChatBotResponseSettingsProtectionMinutesDefault),
+  "verificationEnabled": zod.boolean().default(updateChatBotResponseSettingsVerificationEnabledDefault),
+  "verificationMinutes": zod.number().min(1).max(updateChatBotResponseSettingsVerificationMinutesMax).default(updateChatBotResponseSettingsVerificationMinutesDefault),
+  "welcomeEnabled": zod.boolean().default(updateChatBotResponseSettingsWelcomeEnabledDefault),
+  "violationAction": zod.enum(['delete', 'warn', 'mute', 'kick', 'ban']).default(updateChatBotResponseSettingsViolationActionDefault),
+  "finalSanction": zod.enum(['mute', 'kick', 'ban']).default(updateChatBotResponseSettingsFinalSanctionDefault),
+  "permissions": zod.object({
+  "deleteMessages": zod.boolean().default(updateChatBotResponseSettingsPermissionsDeleteMessagesDefault),
+  "deleteMedia": zod.boolean().default(updateChatBotResponseSettingsPermissionsDeleteMediaDefault),
+  "deleteLinks": zod.boolean().default(updateChatBotResponseSettingsPermissionsDeleteLinksDefault),
+  "warn": zod.boolean().default(updateChatBotResponseSettingsPermissionsWarnDefault),
+  "mute": zod.boolean().default(updateChatBotResponseSettingsPermissionsMuteDefault),
+  "kick": zod.boolean().default(updateChatBotResponseSettingsPermissionsKickDefault),
+  "ban": zod.boolean().default(updateChatBotResponseSettingsPermissionsBanDefault),
+  "unban": zod.boolean().default(updateChatBotResponseSettingsPermissionsUnbanDefault),
+  "viewLogs": zod.boolean().default(updateChatBotResponseSettingsPermissionsViewLogsDefault),
+  "viewStats": zod.boolean().default(updateChatBotResponseSettingsPermissionsViewStatsDefault),
+  "manageSettings": zod.boolean().default(updateChatBotResponseSettingsPermissionsManageSettingsDefault)
+}).optional(),
   "maxMessages": zod.number().min(updateChatBotResponseSettingsMaxMessagesMin).max(updateChatBotResponseSettingsMaxMessagesMax),
   "windowSeconds": zod.number().min(updateChatBotResponseSettingsWindowSecondsMin).max(updateChatBotResponseSettingsWindowSecondsMax),
   "blockLinks": zod.boolean(),
@@ -192,18 +428,19 @@ export const RunChatBotActionParams = zod.object({
 
 
 
-export const runChatBotActionBodyDurationMinutesMax = 1440;
+export const runChatBotActionBodyDurationMinutesMax = 43200;
 
 export const runChatBotActionBodyReasonMax = 500;
 
 
 
 export const RunChatBotActionBody = zod.object({
-  "action": zod.enum(['warn', 'mute', 'unmute', 'ban', 'unban', 'reset', 'delete']),
+  "action": zod.enum(['warn', 'mute', 'unmute', 'kick', 'ban', 'unban', 'reset', 'delete', 'verify']),
   "targetUserId": zod.number().min(1).optional(),
   "messageId": zod.number().min(1).optional(),
   "durationMinutes": zod.number().min(1).max(runChatBotActionBodyDurationMinutesMax).optional(),
-  "reason": zod.string().max(runChatBotActionBodyReasonMax).optional()
+  "reason": zod.string().max(runChatBotActionBodyReasonMax).optional(),
+  "requestId": zod.string().uuid().optional().describe('Reuse the same UUID when retrying an action')
 })
 
 export const RunChatBotActionResponse = zod.object({

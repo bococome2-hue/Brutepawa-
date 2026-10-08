@@ -29,6 +29,52 @@ tags:
     description: Administration
 
 paths:
+  /chat-groups/{id}/bot/profile:
+    get:
+      operationId: getChatBotProfile
+      tags: [chat]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: System bot profile and verification state for a current member
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, handle, official, enabled, description, pendingVerification]
+                properties:
+                  name: { type: string }
+                  handle: { type: string }
+                  official: { type: boolean }
+                  enabled: { type: boolean }
+                  description: { type: string }
+                  pendingVerification: { type: boolean }
+                  verificationExpiresAt: { type: string, format: date-time, nullable: true }
+        "403": { description: Not a group member }
+  /chat-groups/{id}/bot/verify:
+    post:
+      operationId: verifyChatBotMember
+      tags: [chat]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "204": { description: Current authenticated member acknowledged the group rules }
+        "403": { description: Not a group member }
+  /chat-groups/{id}/bot/statistics:
+    get:
+      operationId: getChatBotStatistics
+      tags: [chat]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: period, in: query, schema: { type: string, enum: [today, seven, thirty, total], default: seven } }
+      responses:
+        "200":
+          description: Persisted bot counters; calendar periods use UTC
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChatBotStatistics" }
+        "403": { description: Not permitted to view bot statistics }
   /chat-groups/{id}/bot:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer, minimum: 1 } }
@@ -1158,6 +1204,19 @@ components:
       properties:
         enabled: { type: boolean }
         antiSpam: { type: boolean }
+        antiFlood: { type: boolean, default: true }
+        duplicateThreshold: { type: integer, minimum: 2, maximum: 10, default: 3 }
+        maxMedia: { type: integer, minimum: 1, maximum: 30, default: 3 }
+        maxMentions: { type: integer, minimum: 2, maximum: 100, default: 8 }
+        wordFilter: { type: boolean, default: true }
+        newMemberProtection: { type: boolean, default: false }
+        protectionMinutes: { type: integer, minimum: 1, maximum: 1440, default: 10 }
+        verificationEnabled: { type: boolean, default: false }
+        verificationMinutes: { type: integer, minimum: 1, maximum: 60, default: 10 }
+        welcomeEnabled: { type: boolean, default: true }
+        violationAction: { type: string, enum: [delete, warn, mute, kick, ban], default: warn }
+        finalSanction: { type: string, enum: [mute, kick, ban], default: mute }
+        permissions: { $ref: "#/components/schemas/ChatBotPermissions" }
         maxMessages: { type: integer, minimum: 2, maximum: 30 }
         windowSeconds: { type: integer, minimum: 3, maximum: 120 }
         blockLinks: { type: boolean }
@@ -1171,22 +1230,63 @@ components:
           items: { type: string, minLength: 1, maxLength: 80 }
         warnBeforeMute: { type: integer, minimum: 1, maximum: 10 }
         warnBeforeBan: { type: integer, minimum: 2, maximum: 30, description: Must exceed warnBeforeMute }
-        muteMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        muteMinutes: { type: integer, minimum: 1, maximum: 43200 }
         rules: { type: string, maxLength: 2000 }
         welcomeMessage: { type: string, maxLength: 1000 }
     ChatBotActionInput:
       type: object
       required: [action]
       properties:
-        action: { type: string, enum: [warn, mute, unmute, ban, unban, reset, delete] }
+        action: { type: string, enum: [warn, mute, unmute, kick, ban, unban, reset, delete, verify] }
         targetUserId: { type: integer, minimum: 1 }
         messageId: { type: integer, minimum: 1 }
-        durationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+        durationMinutes: { type: integer, minimum: 1, maximum: 43200 }
         reason: { type: string, maxLength: 500 }
+        requestId: { type: string, format: uuid, description: Reuse the same UUID when retrying an action }
+    ChatBotPermissions:
+      type: object
+      additionalProperties: false
+      properties:
+        deleteMessages: { type: boolean, default: true }
+        deleteMedia: { type: boolean, default: true }
+        deleteLinks: { type: boolean, default: true }
+        warn: { type: boolean, default: true }
+        mute: { type: boolean, default: true }
+        kick: { type: boolean, default: false }
+        ban: { type: boolean, default: false }
+        unban: { type: boolean, default: false }
+        viewLogs: { type: boolean, default: true }
+        viewStats: { type: boolean, default: true }
+        manageSettings: { type: boolean, default: true }
+    ChatBotStatistics:
+      type: object
+      required: [period, timeZone, analyzed, deleted, blocked, spam, links, warnings, mutes, kicks, bans, protectedUsers, trackingSince]
+      properties:
+        period: { type: string }
+        timeZone: { type: string }
+        trackingSince: { type: string, format: date-time, nullable: true }
+        analyzed: { type: integer }
+        deleted: { type: integer }
+        blocked: { type: integer }
+        spam: { type: integer }
+        links: { type: integer }
+        warnings: { type: integer }
+        mutes: { type: integer }
+        kicks: { type: integer }
+        bans: { type: integer }
+        protectedUsers: { type: integer }
     ChatBotState:
       type: object
       required: [settings, logs, sanctions, members]
       properties:
+        myRole: { type: string, enum: [owner, admin] }
+        profile:
+          type: object
+          properties:
+            name: { type: string }
+            handle: { type: string }
+            official: { type: boolean }
+            description: { type: string }
         settings: { $ref: "#/components/schemas/ChatBotSettings" }
         logs:
           type: array
@@ -1200,6 +1300,9 @@ components:
               actorId: { type: integer, nullable: true }
               detail: { type: string }
               createdAt: { type: string, format: date-time }
+              messageId: { type: integer, nullable: true }
+              expiresAt: { type: string, format: date-time, nullable: true }
+              metadata: { type: object, additionalProperties: true }
         sanctions:
           type: array
           items:
@@ -1211,6 +1314,7 @@ components:
               warnings: { type: integer }
               mutedUntil: { type: string, format: date-time, nullable: true }
               banned: { type: boolean }
+              verificationUntil: { type: string, format: date-time, nullable: true }
         members:
           type: array
           items:

@@ -8,9 +8,13 @@
 import type { ChatBotSettings } from './chatBotSettings';
 import type { ChatBotStateLogsItem } from './chatBotStateLogsItem';
 import type { ChatBotStateMembersItem } from './chatBotStateMembersItem';
+import type { ChatBotStateMyRole } from './chatBotStateMyRole';
+import type { ChatBotStateProfile } from './chatBotStateProfile';
 import type { ChatBotStateSanctionsItem } from './chatBotStateSanctionsItem';
 
 export interface ChatBotState {
+  myRole?: ChatBotStateMyRole;
+  profile?: ChatBotStateProfile;
   settings: ChatBotSettings;
   logs: ChatBotStateLogsItem[];
   sanctions: ChatBotStateSanctionsItem[];

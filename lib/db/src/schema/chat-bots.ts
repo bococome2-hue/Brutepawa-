@@ -1,4 +1,4 @@
-import { pgTable, integer, boolean, text, timestamp, jsonb, serial, primaryKey, index } from "drizzle-orm/pg-core";
+import { pgTable, integer, boolean, text, timestamp, jsonb, serial, primaryKey, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { chatGroupsTable } from "./social";
 import { usersTable } from "./users";
 
@@ -13,6 +13,7 @@ export const chatBotSanctionsTable = pgTable("chat_bot_sanctions", {
   warnings: integer("warnings").notNull().default(0),
   mutedUntil: timestamp("muted_until", { withTimezone: true }),
   banned: boolean("banned").notNull().default(false),
+  verificationUntil: timestamp("verification_until", { withTimezone: true }),
   recentMessages: jsonb("recent_messages").$type<{ time: number; fingerprint: string }[]>().notNull().default([]),
 }, t => [primaryKey({ columns: [t.groupId, t.userId] })]);
 
@@ -23,5 +24,10 @@ export const chatBotLogsTable = pgTable("chat_bot_logs", {
   targetUserId: integer("target_user_id"),
   action: text("action").notNull(),
   detail: text("detail").notNull(),
+  messageId: integer("message_id"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  requestId: text("request_id"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, t => [index("chat_bot_logs_group_idx").on(t.groupId, t.createdAt)]);
+}, t => [index("chat_bot_logs_group_idx").on(t.groupId, t.createdAt),
+  uniqueIndex("chat_bot_logs_request_idx").on(t.groupId, t.requestId)]);

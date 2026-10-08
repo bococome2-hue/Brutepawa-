@@ -48,9 +48,76 @@ export interface ChatGroupStatistics {
   recentActivity: ChatGroupStatisticsRecentActivityItem[];
 }
 
+export type ChatBotSettingsViolationAction = typeof ChatBotSettingsViolationAction[keyof typeof ChatBotSettingsViolationAction];
+
+
+export const ChatBotSettingsViolationAction = {
+  delete: 'delete',
+  warn: 'warn',
+  mute: 'mute',
+  kick: 'kick',
+  ban: 'ban',
+} as const;
+
+export type ChatBotSettingsFinalSanction = typeof ChatBotSettingsFinalSanction[keyof typeof ChatBotSettingsFinalSanction];
+
+
+export const ChatBotSettingsFinalSanction = {
+  mute: 'mute',
+  kick: 'kick',
+  ban: 'ban',
+} as const;
+
+export interface ChatBotPermissions {
+  deleteMessages?: boolean;
+  deleteMedia?: boolean;
+  deleteLinks?: boolean;
+  warn?: boolean;
+  mute?: boolean;
+  kick?: boolean;
+  ban?: boolean;
+  unban?: boolean;
+  viewLogs?: boolean;
+  viewStats?: boolean;
+  manageSettings?: boolean;
+}
+
 export interface ChatBotSettings {
   enabled: boolean;
   antiSpam: boolean;
+  antiFlood?: boolean;
+  /**
+     * @minimum 2
+     * @maximum 10
+     */
+  duplicateThreshold?: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  maxMedia?: number;
+  /**
+     * @minimum 2
+     * @maximum 100
+     */
+  maxMentions?: number;
+  wordFilter?: boolean;
+  newMemberProtection?: boolean;
+  /**
+     * @minimum 1
+     * @maximum 1440
+     */
+  protectionMinutes?: number;
+  verificationEnabled?: boolean;
+  /**
+     * @minimum 1
+     * @maximum 60
+     */
+  verificationMinutes?: number;
+  welcomeEnabled?: boolean;
+  violationAction?: ChatBotSettingsViolationAction;
+  finalSanction?: ChatBotSettingsFinalSanction;
+  permissions?: ChatBotPermissions;
   /**
      * @minimum 2
      * @maximum 30
@@ -86,7 +153,7 @@ export interface ChatBotSettings {
   warnBeforeBan: number;
   /**
      * @minimum 1
-     * @maximum 1440
+     * @maximum 43200
      */
   muteMinutes: number;
   /** @maxLength 2000 */
@@ -102,10 +169,12 @@ export const ChatBotActionInputAction = {
   warn: 'warn',
   mute: 'mute',
   unmute: 'unmute',
+  kick: 'kick',
   ban: 'ban',
   unban: 'unban',
   reset: 'reset',
   delete: 'delete',
+  verify: 'verify',
 } as const;
 
 export interface ChatBotActionInput {
@@ -116,12 +185,47 @@ export interface ChatBotActionInput {
   messageId?: number;
   /**
      * @minimum 1
-     * @maximum 1440
+     * @maximum 43200
      */
   durationMinutes?: number;
   /** @maxLength 500 */
   reason?: string;
+  /** Reuse the same UUID when retrying an action */
+  requestId?: string;
 }
+
+export interface ChatBotStatistics {
+  period: string;
+  timeZone: string;
+  trackingSince: string | null;
+  analyzed: number;
+  deleted: number;
+  blocked: number;
+  spam: number;
+  links: number;
+  warnings: number;
+  mutes: number;
+  kicks: number;
+  bans: number;
+  protectedUsers: number;
+}
+
+export type ChatBotStateMyRole = typeof ChatBotStateMyRole[keyof typeof ChatBotStateMyRole];
+
+
+export const ChatBotStateMyRole = {
+  owner: 'owner',
+  admin: 'admin',
+} as const;
+
+export type ChatBotStateProfile = {
+  name?: string;
+  handle?: string;
+  official?: boolean;
+  description?: string;
+};
+
+export type ChatBotStateLogsItemMetadata = { [key: string]: unknown };
 
 export type ChatBotStateLogsItem = {
   id: number;
@@ -130,6 +234,9 @@ export type ChatBotStateLogsItem = {
   actorId: number | null;
   detail: string;
   createdAt: string;
+  messageId?: number | null;
+  expiresAt?: string | null;
+  metadata?: ChatBotStateLogsItemMetadata;
 };
 
 export type ChatBotStateSanctionsItem = {
@@ -138,6 +245,7 @@ export type ChatBotStateSanctionsItem = {
   warnings: number;
   mutedUntil: string | null;
   banned: boolean;
+  verificationUntil?: string | null;
 };
 
 export type ChatBotStateMembersItemRole = typeof ChatBotStateMembersItemRole[keyof typeof ChatBotStateMembersItemRole];
@@ -156,6 +264,8 @@ export type ChatBotStateMembersItem = {
 };
 
 export interface ChatBotState {
+  myRole?: ChatBotStateMyRole;
+  profile?: ChatBotStateProfile;
   settings: ChatBotSettings;
   logs: ChatBotStateLogsItem[];
   sanctions: ChatBotStateSanctionsItem[];
@@ -748,6 +858,30 @@ export interface AdminStats {
 }
 
 export type ChatGroupViewInputBody = ChatGroupView;
+
+export type GetChatBotProfile200 = {
+  name: string;
+  handle: string;
+  official: boolean;
+  enabled: boolean;
+  description: string;
+  pendingVerification: boolean;
+  verificationExpiresAt?: string | null;
+};
+
+export type GetChatBotStatisticsParams = {
+period?: GetChatBotStatisticsPeriod;
+};
+
+export type GetChatBotStatisticsPeriod = typeof GetChatBotStatisticsPeriod[keyof typeof GetChatBotStatisticsPeriod];
+
+
+export const GetChatBotStatisticsPeriod = {
+  today: 'today',
+  seven: 'seven',
+  thirty: 'thirty',
+  total: 'total',
+} as const;
 
 export type UpdateChatBot200 = {
   settings: ChatBotSettings;

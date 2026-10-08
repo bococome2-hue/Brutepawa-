@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "../router";
 import PollMessageCard from "../components/PollMessageCard";
 import ChatBotPanel from "../components/ChatBotPanel";
+import type { BotSection } from "../components/ChatBotPanel";
+import GroupBotStatus from "../components/GroupBotStatus";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { openImageViewer } from "../components/ImageViewer";
 import { apiFetch, apiGetConversations, apiGetMessages, apiMarkMessagesRead, apiSendMessage, apiGetUsers, apiGetUserPresence, apiGetChatGroups, apiCreateChatGroup, apiGetChatGroupInfo, apiGetChatGroupMessages, apiSendChatGroupMessage, apiLeaveChatGroup, apiUpdateChatGroup, apiSendTyping, apiGetTyping, apiUploadFile, apiUploadFileXHR, apiUploadVoice, apiDeleteConversation, apiDeleteMessage, apiGetLinkPreview, apiGetMessagingSettings, apiUpdateMessagingSettings, apiGetMessageRequests, apiUpdateMessageRequest, apiGetContactInfo, apiMuteContact, apiUnmuteContact, apiPinContact, apiUnpinContact, apiFavoriteContact, apiUnfavoriteContact, apiBlockUser, apiUnblockUser, apiReportUser, apiSendFriendRequest, apiSearchInConversation, apiDeleteConversationContact, apiGetMyGroups, apiAddContactToGroup, apiGetGroupAuditLog, apiKickGroupMember, apiChangeGroupMemberRole, apiGetGroupSettings, apiPatchGroupSettings, apiPatchGroupPermissions, apiPatchGroupReactions, apiSetChatGroupMemberRole, apiRemoveChatGroupMember, apiGetChatGroupMembersGrouped, apiAddChatGroupMembers, apiGetGroupInviteLinks, apiCreateGroupInviteLink, apiRevokeGroupInviteLink, apiUpdateGroupInviteLink, apiGetGroupInviteLinkStats, type PublicUser, type ApiChatGroup, type ApiChatGroupInfo, type LinkPreview, type MessageRequest, type ContactInfo, type GroupAuditEntry, type ApiGroupInviteLink, type ApiGroupInviteLinkStats } from "../lib/api";
@@ -644,7 +646,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const [screenShareTouches, setScreenShareTouches] = useState(false);
 
   const [chatGroups, setChatGroups]         = useState<ChatGroupConv[]>([]);
-  const [activeGroupId, setActiveGroupId]   = useState<number | null>(null);
+  const [activeGroupId, setActiveGroupId]   = useState<number | null>(initialGroupId ?? null);
 
   useEffect(() => {
     const isConversationOpen = activeConv !== null || activeGroupId !== null;
@@ -656,6 +658,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const [showGroupInfo, setShowGroupInfo]   = useState(false);
   const [groupNewMsg, setGroupNewMsg]       = useState("");
   const [showChatBot, setShowChatBot] = useState(false);
+  const [botSection, setBotSection] = useState<BotSection | undefined>(undefined);
   const [groupSendError, setGroupSendError] = useState<{ groupId: number; message: string } | null>(null);
   const groupActivity = useGroupActivity(activeGroupId, groupNewMsg);
   const [dismissedAddBanner, setDismissedAddBanner]   = useState<Set<number>>(new Set());
@@ -1987,6 +1990,9 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     const content = groupNewMsg.trim();
     if (!content || !activeGroupId) return;
     const groupId = activeGroupId;
+    const role = chatGroups.find(g => g.id === groupId)?.role;
+    if ((role === "owner" || role === "admin") && /^\/(ban|kick|delete)\b/.test(content) &&
+      !window.confirm(`Confirmer cette commande de modération ?\n${content.slice(0, 180)}`)) return;
     setGroupSendError(null);
     const now = new Date().toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" });
     const optimistic: GroupMsg = { id: Date.now(), text: content, senderName: "Moi", mine: true, time: now, type: "text" };
@@ -1995,11 +2001,11 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     setGroupNewMsg(""); if (grpInputRef.current) { grpInputRef.current.style.height = "22px"; grpInputRef.current.style.overflowY = "hidden"; }
     apiSendChatGroupMessage(groupId, content)
       .then(sent => {
-        setGroupMsgs(prev => ({ ...prev, [groupId]: (prev[groupId] ?? []).map(m => m.id !== optimistic.id ? m : {
+        setGroupMsgs(prev => ({ ...prev, [groupId]: [...new Map((prev[groupId] ?? []).map(m => m.id !== optimistic.id ? m : {
           id: sent.id, text: sent.content, senderName: sent.senderName, mine: sent.senderId === meId,
           time: new Date(sent.createdAt).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" }),
           type: sent.type,
-        }) }));
+        }).map(m => [m.id, m] as const)).values()] }));
         trackEvent("message_sent", { conversation_type: "group", content_type: "text" });
       })
       .catch(error => {
@@ -2023,7 +2029,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
         membersCount: wizardMembers.size + 1, lastMessage: "", lastMessageAt: g.createdAt,
         unread: 0, role: "owner",
       };
-      setChatGroups(prev => [newGroup, ...prev]);
+      setChatGroups(prev => [newGroup, ...prev.filter(g => g.id !== newGroup.id)]);
       setGroupWizard("none"); setWizardGroupName(""); setWizardMembers(new Set()); setWizardSearch("");
       setActiveGroupId(g.id);
     } catch { /* silent */ } finally { setWizardCreating(false); }
@@ -6157,9 +6163,18 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
               const isMatch = showGrpSearch && grpSearchQ.trim() && msg.type !== "system" && msg.text.toLowerCase().includes(grpSearchQ.toLowerCase());
               const isCurrent = msg.id === grpHighlightId;
               if (msg.type === "system") {
+                const botMenu = msg.text.includes("__botmenu__");
+                const isAdm = grp?.role === "owner" || grp?.role === "admin";
                 return (
                   <div key={msg.id} style={{ alignSelf:"center", background:"rgba(0,0,0,0.32)", borderRadius:20, padding:"4px 14px", margin:"4px auto" }}>
-                    <span style={{ fontSize:12, color:"#fff", fontWeight:500 }}>{msg.text}</span>
+                    <span style={{ fontSize:12, color:"#fff", fontWeight:500 }}>{msg.text.replace(/__botmenu__/g, "").trim()}</span>
+                    {botMenu && isAdm && (
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginTop:6 }}>
+                        {([["settings","Configuration"],["moderation","Modération"],["stats","Statistiques"],["logs","Historique"]] as [BotSection,string][]).map(([k,l]) => (
+                          <button key={k} onClick={() => { setBotSection(k); setShowChatBot(true); }} style={{ minHeight:36, padding:"0 12px", borderRadius:18, border:0, background:"#fff", color:"var(--bp-primary)", fontSize:12, fontWeight:700 }}>{l}</button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -6207,6 +6222,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
           <div ref={groupBottomRef} />
         </div>
 
+        {activeGroupId && <GroupBotStatus key={activeGroupId} groupId={activeGroupId} />}
         {/* ── PARAMÈTRES sticky row (admin shortcut) ── */}
         {(() => {
           // Prefer the role from the group list (loaded upfront) to avoid depending on the
@@ -6221,7 +6237,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
                 PARAMÈTRES
               </button>
               <div style={{ width:1, height:16, background:"rgba(0,0,0,0.12)" }} />
-              <button onClick={() => setShowChatBot(true)} style={{ border:0, background:"none", cursor:"pointer", padding:"8px 4px", color:"var(--bp-primary)", fontSize:12, fontWeight:700 }}>
+              <button onClick={() => { setBotSection(undefined); setShowChatBot(true); }} style={{ border:0, background:"none", cursor:"pointer", padding:"8px 4px", color:"var(--bp-primary)", fontSize:12, fontWeight:700 }}>
                 Bot de modération
               </button>
               <button onClick={() => setShowGrpStats(true)} style={{ background:"none", cursor:"pointer", width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:"50%", border:"1.5px solid var(--bp-primary)" }}>
@@ -6232,7 +6248,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
         })()}
 
         {/* ══ INPUT BAR — Telegram pill ══ */}
-        {showChatBot && activeGroupId && <ChatBotPanel key={activeGroupId} groupId={activeGroupId} onClose={() => {
+        {showChatBot && activeGroupId && <ChatBotPanel key={activeGroupId} groupId={activeGroupId} initialSection={botSection} groupName={chatGroups.find(g => g.id === activeGroupId)?.name} onClose={() => {
           setShowChatBot(false);
           refreshGroupInfo();
           apiGetChatGroupMessages(activeGroupId).then(msgs => setGroupMsgs(prev => ({ ...prev, [activeGroupId]: msgs.map(m => ({

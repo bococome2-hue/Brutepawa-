@@ -5,6 +5,7 @@
  * AfriConnect API - Super-app for West Africa
  * OpenAPI spec version: 0.1.0
  */
+import type { ChatBotStateLogsItemMetadata } from './chatBotStateLogsItemMetadata';
 
 export type ChatBotStateLogsItem = {
   id: number;
@@ -13,4 +14,7 @@ export type ChatBotStateLogsItem = {
   actorId: number | null;
   detail: string;
   createdAt: Date;
+  messageId?: number | null;
+  expiresAt?: Date | null;
+  metadata?: ChatBotStateLogsItemMetadata;
 };

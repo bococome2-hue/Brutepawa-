@@ -12,4 +12,5 @@ export * from "./broadcast";
 export * from "./people";
 export * from "./chat-presence";
 export * from "./chat-bots";
+export * from "./chat-bot-metrics";
 export * from "./chat-group-views";

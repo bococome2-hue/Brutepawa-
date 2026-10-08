@@ -13,8 +13,10 @@ export const ChatBotActionInputAction = {
   warn: 'warn',
   mute: 'mute',
   unmute: 'unmute',
+  kick: 'kick',
   ban: 'ban',
   unban: 'unban',
   reset: 'reset',
   delete: 'delete',
+  verify: 'verify',
 } as const;

@@ -8,7 +8,8 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:chat-bot": "esbuild src/lib/chatBotConfig.test.mjs --bundle --platform=node --format=cjs --outfile=../../.local/chat-bot-config.test.cjs && node --test ../../.local/chat-bot-config.test.cjs"
+    "test:chat-bot": "esbuild src/lib/chatBotConfig.test.mjs --bundle --platform=node --format=cjs --outfile=../../.local/chat-bot-config.test.cjs && node --test ../../.local/chat-bot-config.test.cjs",
+    "test:chat-bot:integration": "esbuild src/lib/chatBot.integration.test.mjs --bundle --platform=node --format=esm --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=../../.local/chat-bot-integration.test.mjs && NODE_ENV=development node ../../.local/chat-bot-integration.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1066.0",

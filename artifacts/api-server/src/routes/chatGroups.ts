@@ -293,7 +293,7 @@ router.post("/chat-groups/:id/members", requireAuth, async (req, res): Promise<v
   if (!Array.isArray(userIds) || userIds.length === 0 || userIds.length > 1000 || userIds.some(uid => !Number.isSafeInteger(uid) || uid <= 0)) { res.status(400).json({ error: "userIds requis (1 à 1000 identifiants valides)" }); return; }
 
   try {
-    await addChatMembers(id, userIds);
+    await addChatMembers(id, userIds, me);
   } catch (error) {
     if (!(error instanceof BotError)) throw error;
     res.status(error.status).json({ error: error.message }); return;

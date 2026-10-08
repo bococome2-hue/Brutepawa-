@@ -12,4 +12,5 @@ export type ChatBotStateSanctionsItem = {
   warnings: number;
   mutedUntil: Date | null;
   banned: boolean;
+  verificationUntil?: Date | null;
 };

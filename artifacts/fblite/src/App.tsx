@@ -637,7 +637,8 @@ function AppContent() {
   }
 
   if (path.startsWith("/messages")) {
-    const qs2 = path.includes("?") ? path.slice(path.indexOf("?") + 1) : "";
+    // Initial loads/popstate expose pathname only through this router.
+    const qs2 = path.includes("?") ? path.slice(path.indexOf("?") + 1) : window.location.search.slice(1);
     const params2 = new URLSearchParams(qs2);
     const uid = params2.get("userId");
     const gid2 = params2.get("groupId");
