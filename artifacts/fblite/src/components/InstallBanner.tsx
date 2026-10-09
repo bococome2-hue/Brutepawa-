@@ -88,7 +88,7 @@ export default function InstallBanner() {
   const pct = (countdown / AUTO_DISMISS_SEC) * 100;
 
   return (
-    <div style={{
+    <div data-bp-install-banner style={{
       position: "fixed", bottom: 60, left: 0, right: 0, zIndex: 9999,
       background: "var(--theme-surface)",
       borderTop: "1px solid #E5E7EB",

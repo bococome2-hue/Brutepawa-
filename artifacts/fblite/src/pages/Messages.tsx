@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "../router";
 import PollMessageCard from "../components/PollMessageCard";
@@ -176,7 +176,9 @@ interface GroupMsg {
   senderName: string;
   mine: boolean;
   time: string;
+  createdAt?: string;
   type: "text" | "system";
+  sent?: boolean;
   attachment?: { type: "image" | "sticker" | "doc" | "location" | "audio" | "contact" | "poll"; label: string; extra?: string; size?: number };
 }
 
@@ -272,6 +274,29 @@ function fmtConvPreview(raw: string): { text: string; isAudio: boolean } {
   if (raw.startsWith("__location__:")) return { text: "📍 Localisation", isAudio: false };
   if (raw.startsWith("__poll__:")) return { text: "Sondage", isAudio: false };
   return { text: raw.length > 55 ? raw.slice(0, 55) + "…" : raw, isAudio: false };
+}
+
+function parseGroupContent(raw: string): { text: string; attachment?: GroupMsg["attachment"] } {
+  if (raw.startsWith("__audio__:")) {
+    const rest = raw.slice("__audio__:".length);
+    const split = rest.indexOf(":");
+    const seconds = Number(rest.slice(0, split));
+    return { text: "", attachment: { type: "audio", label: rest.slice(split + 1), extra: Number.isFinite(seconds) ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` : "" } };
+  }
+  const prefix = ["__image__", "__sticker__", "__doc__"].find(key => raw.startsWith(`${key}:`));
+  if (prefix) {
+    const rest = raw.slice(prefix.length + 1);
+    const proto = rest.indexOf("://");
+    const sep = rest.indexOf(":", proto !== -1 ? proto + 3 : 0);
+    const label = sep === -1 ? rest : rest.slice(sep + 1);
+    const url = sep === -1 ? rest : rest.slice(0, sep);
+    const sizeSep = label.lastIndexOf(":");
+    const name = sizeSep === -1 ? label : label.slice(0, sizeSep);
+    const size = sizeSep === -1 ? undefined : Number(label.slice(sizeSep + 1));
+    const type = prefix === "__doc__" ? "doc" : prefix === "__sticker__" || url.includes("/stickers/brutepawa-") ? "sticker" : "image";
+    return { text: "", attachment: { type, label: url, extra: name, size: Number.isFinite(size) ? size : undefined } };
+  }
+  return { text: raw };
 }
 
 /* ── OSM tile math ── */
@@ -648,15 +673,22 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const [chatGroups, setChatGroups]         = useState<ChatGroupConv[]>([]);
   const [activeGroupId, setActiveGroupId]   = useState<number | null>(initialGroupId ?? null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const isConversationOpen = activeConv !== null || activeGroupId !== null;
     document.body.classList.toggle("bp-chat-fullscreen", isConversationOpen);
-    return () => document.body.classList.remove("bp-chat-fullscreen");
+    document.body.classList.toggle("bp-group-chat-native-scale", activeGroupId !== null);
+    return () => {
+      document.body.classList.remove("bp-chat-fullscreen");
+      document.body.classList.remove("bp-group-chat-native-scale");
+    };
   }, [activeConv, activeGroupId]);
   const [groupMsgs, setGroupMsgs]           = useState<Record<number, GroupMsg[]>>({});
   const [groupInfo, setGroupInfo]           = useState<ApiChatGroupInfo | null>(null);
   const [showGroupInfo, setShowGroupInfo]   = useState(false);
   const [groupNewMsg, setGroupNewMsg]       = useState("");
+  const [groupMediaBusy, setGroupMediaBusy] = useState(false);
+  const [groupRecording, setGroupRecording] = useState(false);
+  const [groupRecordingSeconds, setGroupRecordingSeconds] = useState(0);
   const [showChatBot, setShowChatBot] = useState(false);
   const [botSection, setBotSection] = useState<BotSection | undefined>(undefined);
   const [groupSendError, setGroupSendError] = useState<{ groupId: number; message: string } | null>(null);
@@ -875,6 +907,12 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const longPressTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeGroupRef    = useRef<number | null>(null);
   const groupBottomRef    = useRef<HTMLDivElement>(null);
+  const groupScrollRef    = useRef<HTMLDivElement>(null);
+  const groupNewMsgRef    = useRef(groupNewMsg);
+  groupNewMsgRef.current = groupNewMsg;
+  const groupNearBottomRef = useRef(true);
+  const groupLastRenderedIdRef = useRef<number | null>(null);
+  const groupRenderedGroupRef = useRef<number | null>(null);
   const bottomRef         = useRef<HTMLDivElement>(null);
   const remoteAudioRef    = useRef<HTMLAudioElement>(null);
   const voicePlayerRef    = useRef<HTMLAudioElement>(null);
@@ -897,6 +935,12 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   const linkPreviewCacheRef = useRef<Map<string, LinkPreview | "loading" | null>>(new Map());
   const dmInputRef    = useRef<HTMLTextAreaElement>(null);
   const grpInputRef   = useRef<HTMLTextAreaElement>(null);
+  const groupFileInputRef = useRef<HTMLInputElement>(null);
+  const groupRecorderRef = useRef<MediaRecorder | null>(null);
+  const groupRecordingStreamRef = useRef<MediaStream | null>(null);
+  const groupRecordingChunksRef = useRef<Blob[]>([]);
+  const groupRecordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const groupRecordingStartedAtRef = useRef(0);
   const pickerTransitioningRef = useRef(false);
 
 
@@ -955,6 +999,29 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
 
     pickerTransitioningRef.current = true;
     input?.blur();
+    await waitForKeyboardDismiss();
+    setPickerClosing(false);
+    setShowEmojiPicker(true);
+    pickerTransitioningRef.current = false;
+  };
+
+  const toggleGroupEmojiPicker = async () => {
+    if (pickerClosing || pickerTransitioningRef.current) return;
+    if (showEmojiPicker) {
+      pickerTransitioningRef.current = true;
+      setPickerClosing(true);
+      window.setTimeout(() => {
+        setShowEmojiPicker(false);
+        setPickerClosing(false);
+        window.requestAnimationFrame(() => {
+          grpInputRef.current?.focus({ preventScroll: true });
+          pickerTransitioningRef.current = false;
+        });
+      }, 180);
+      return;
+    }
+    pickerTransitioningRef.current = true;
+    grpInputRef.current?.blur();
     await waitForKeyboardDismiss();
     setPickerClosing(false);
     setShowEmojiPicker(true);
@@ -1062,8 +1129,13 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     const handler = () => {
       setVpHeight(vv.height);
       setVpOffset(vv.offsetTop);
-      // auto-scroll to last message when keyboard pushes content up
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" as ScrollBehavior }), 50);
+        // Preserve keyboard recovery without pulling an older-message reader to the end.
+        const groupWasNearBottom = groupNearBottomRef.current;
+        setTimeout(() => {
+          if (activeGroupRef.current !== null) {
+            if (groupWasNearBottom && groupNearBottomRef.current) groupBottomRef.current?.scrollIntoView({ behavior: "instant" as ScrollBehavior, block:"end" });
+          } else bottomRef.current?.scrollIntoView({ behavior: "instant" as ScrollBehavior });
+        }, 50);
     };
     handler();
     vv.addEventListener("resize", handler);
@@ -1171,7 +1243,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     }).catch(() => {});
   }, [activeConv, messages, parseApiMsg]);
 
-  const sendAttachMsg = useCallback((attachment: { type: "image"|"doc"|"location"|"audio"|"contact"; label: string; extra?: string }, text: string, encodedContent: string) => {
+  const sendAttachMsg = useCallback((attachment: { type: "image"|"sticker"|"doc"|"location"|"audio"|"contact"; label: string; extra?: string }, text: string, encodedContent: string) => {
     if (!activeConv) return;
     const convId = activeConv;
     const tmpId = Date.now();
@@ -1897,10 +1969,11 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
       apiGetChatGroupMessages(activeGroupId).then(msgs => {
         setGroupMsgs(prev => {
           const next = msgs.map(m => ({
-            id: m.id, text: m.content, senderName: m.senderName,
+            id: m.id, ...parseGroupContent(m.content), senderName: m.senderName,
             mine: m.senderId === meId,
             time: new Date(m.createdAt).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" }),
-            type: m.type,
+            createdAt: m.createdAt,
+            type: m.type, sent: m.senderId === meId,
           }));
           if (JSON.stringify(next.map(x => x.id)) === JSON.stringify((prev[activeGroupId] ?? []).map(x => x.id))) return prev;
           return { ...prev, [activeGroupId]: next };
@@ -1950,7 +2023,55 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     }
   }, [activeGroupId]);
 
-  useEffect(() => { groupBottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [groupMsgs, activeGroupId]);
+  useEffect(() => {
+    const messages = groupMsgs[activeGroupId ?? -1] ?? [];
+    const lastId = messages[messages.length - 1]?.id ?? null;
+    const switchedGroup = groupRenderedGroupRef.current !== activeGroupId;
+    const appended = lastId !== null && lastId !== groupLastRenderedIdRef.current;
+    if (switchedGroup || (appended && groupNearBottomRef.current)) {
+      requestAnimationFrame(() => groupBottomRef.current?.scrollIntoView({ behavior: switchedGroup ? "auto" : "smooth", block: "end" }));
+      groupNearBottomRef.current = true;
+    }
+    groupRenderedGroupRef.current = activeGroupId;
+    groupLastRenderedIdRef.current = lastId;
+  }, [groupMsgs, activeGroupId]);
+  useEffect(() => {
+    if (activeGroupId === null) return;
+    const root = groupScrollRef.current?.parentElement;
+    if (!root) return;
+    let resizeObserver: ResizeObserver | null = null;
+    const observed = new Set<Element>();
+    const attachResizableChildren = () => {
+      if (!resizeObserver) resizeObserver = new ResizeObserver(() => {
+        if (!groupNearBottomRef.current) return;
+        requestAnimationFrame(() => {
+          if (groupNearBottomRef.current) groupBottomRef.current?.scrollIntoView({ behavior:"auto", block:"end" });
+        });
+      });
+      root.querySelectorAll(".bp-group-bot-card,.bp-group-composer").forEach(element => {
+        if (!observed.has(element)) { observed.add(element); resizeObserver?.observe(element); }
+      });
+    };
+    attachResizableChildren();
+    const mutationObserver = new MutationObserver(attachResizableChildren);
+    mutationObserver.observe(root, { childList:true, subtree:true });
+    return () => { mutationObserver.disconnect(); resizeObserver?.disconnect(); };
+  }, [activeGroupId]);
+  useEffect(() => {
+    setGroupRecording(false);
+    setGroupRecordingSeconds(0);
+    return () => {
+      const recorder = groupRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.onstop = null;
+        recorder.stop();
+      }
+      groupRecordingStreamRef.current?.getTracks().forEach(track => track.stop());
+      groupRecordingStreamRef.current = null;
+      if (groupRecordingTimerRef.current) clearInterval(groupRecordingTimerRef.current);
+      groupRecordingTimerRef.current = null;
+    };
+  }, [activeGroupId]);
   useEffect(() => {
     const grpMatches = grpSearchQ.trim()
       ? (groupMsgs[activeGroupId ?? -1] ?? []).filter((m: {type?:string; text:string}) => m.type !== "system" && m.text.toLowerCase().includes(grpSearchQ.toLowerCase()))
@@ -2004,16 +2125,111 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     apiSendChatGroupMessage(groupId, content)
       .then(sent => {
         setGroupMsgs(prev => ({ ...prev, [groupId]: [...new Map((prev[groupId] ?? []).map(m => m.id !== optimistic.id ? m : {
-          id: sent.id, text: sent.content, senderName: sent.senderName, mine: sent.senderId === meId,
+          id: sent.id, senderName: sent.senderName, mine: sent.senderId === meId,
+          ...parseGroupContent(sent.content),
           time: new Date(sent.createdAt).toLocaleTimeString("fr", { hour: "2-digit", minute: "2-digit" }),
-          type: sent.type,
+          createdAt: sent.createdAt,
+          type: sent.type, sent: true,
         }).map(m => [m.id, m] as const)).values()] }));
         trackEvent("message_sent", { conversation_type: "group", content_type: "text" });
       })
       .catch(error => {
         setGroupMsgs(prev => ({ ...prev, [groupId]: (prev[groupId] ?? []).filter(m => m.id !== optimistic.id) }));
         setGroupSendError({ groupId, message: error instanceof Error ? error.message : "Envoi échoué" });
+        if (activeGroupRef.current === groupId && !groupNewMsgRef.current.trim()) {
+          setGroupNewMsg(previous => previous.trim() ? previous : content);
+        }
       });
+  };
+
+  const sendGroupFile = async (file: File) => {
+    const groupId = activeGroupId;
+    if (!groupId || groupMediaBusy) return;
+    setGroupMediaBusy(true);
+    setGroupSendError(null);
+    const localUrl = URL.createObjectURL(file);
+    const tmpId = Date.now();
+    const kind = file.type.startsWith("image/") ? "image" : "doc";
+    setGroupMsgs(prev => ({ ...prev, [groupId]: [...(prev[groupId] ?? []), {
+      id: tmpId, text: "", senderName: "Moi", mine: true, time: new Date().toLocaleTimeString("fr", { hour:"2-digit", minute:"2-digit" }),
+      type: "text", attachment: { type: kind, label: localUrl, extra: file.name, size: file.size },
+    }] }));
+    try {
+      const { promise } = apiUploadFileXHR(file, () => {});
+      const { url } = await promise;
+      const encoded = `${kind === "image" ? "__image__" : "__doc__"}:${url}:${file.name}:${file.size}`;
+      const sent = await apiSendChatGroupMessage(groupId, encoded);
+      setGroupMsgs(prev => ({ ...prev, [groupId]: (prev[groupId] ?? []).map(m => m.id === tmpId ? {
+        ...m, id: sent.id, ...parseGroupContent(sent.content), senderName: sent.senderName, mine: sent.senderId === meId,
+        time: new Date(sent.createdAt).toLocaleTimeString("fr", { hour:"2-digit", minute:"2-digit" }), createdAt: sent.createdAt, sent: true,
+      } : m) }));
+      setChatGroups(prev => prev.map(group => group.id === groupId ? { ...group, lastMessage: kind === "image" ? "Photo" : "Document", lastMessageAt: sent.createdAt } : group));
+      trackEvent("message_sent", { conversation_type: "group", content_type: kind });
+      URL.revokeObjectURL(localUrl);
+    } catch (error) {
+      setGroupMsgs(prev => ({ ...prev, [groupId]: (prev[groupId] ?? []).filter(m => m.id !== tmpId) }));
+      setGroupSendError({ groupId, message: error instanceof Error ? error.message : "Envoi du fichier échoué" });
+      URL.revokeObjectURL(localUrl);
+    } finally {
+      setGroupMediaBusy(false);
+    }
+  };
+
+  const startGroupRecording = async () => {
+    const groupId = activeGroupId;
+    if (!groupId || groupRecording || groupMediaBusy) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setGroupSendError({ groupId, message: "L’enregistrement vocal n’est pas pris en charge par ce navigateur." });
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find(type => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      groupRecordingStreamRef.current = stream;
+      groupRecordingChunksRef.current = [];
+      recorder.ondataavailable = event => { if (event.data.size) groupRecordingChunksRef.current.push(event.data); };
+      recorder.onstop = async () => {
+        const duration = Math.max(1, Math.round((Date.now() - groupRecordingStartedAtRef.current) / 1000));
+        const blob = new Blob(groupRecordingChunksRef.current, { type: recorder.mimeType || mimeType || "audio/webm" });
+        stream.getTracks().forEach(track => track.stop());
+        groupRecordingStreamRef.current = null;
+        groupRecorderRef.current = null;
+        if (groupRecordingTimerRef.current) clearInterval(groupRecordingTimerRef.current);
+        groupRecordingTimerRef.current = null;
+        setGroupRecording(false);
+        setGroupRecordingSeconds(0);
+        if (!blob.size) return;
+        setGroupMediaBusy(true);
+        setGroupSendError(null);
+        try {
+          const { url } = await apiUploadVoice(blob, Math.max(1, duration));
+          const sent = await apiSendChatGroupMessage(groupId, `__audio__:${Math.max(1, duration)}:${url}`);
+          const parsed = parseGroupContent(sent.content);
+          setGroupMsgs(prev => ({ ...prev, [groupId]: [...(prev[groupId] ?? []), {
+            id: sent.id, ...parsed, senderName: sent.senderName, mine: sent.senderId === meId,
+            time: new Date(sent.createdAt).toLocaleTimeString("fr", { hour:"2-digit", minute:"2-digit" }), createdAt: sent.createdAt, type: sent.type, sent: true,
+          }] }));
+          setChatGroups(prev => prev.map(group => group.id === groupId ? { ...group, lastMessage: "Message vocal", lastMessageAt: sent.createdAt } : group));
+          trackEvent("message_sent", { conversation_type: "group", content_type: "audio" });
+        } catch (error) {
+          setGroupSendError({ groupId, message: error instanceof Error ? error.message : "Envoi du message vocal échoué" });
+        } finally { setGroupMediaBusy(false); }
+      };
+      recorder.start(100);
+      groupRecorderRef.current = recorder;
+      groupRecordingStartedAtRef.current = Date.now();
+      setGroupRecording(true);
+      setGroupRecordingSeconds(0);
+      groupRecordingTimerRef.current = setInterval(() => setGroupRecordingSeconds(value => value + 1), 1000);
+      setGroupSendError(null);
+    } catch {
+      setGroupSendError({ groupId, message: "Accès au microphone refusé. Autorisez le microphone dans les paramètres du navigateur." });
+    }
+  };
+
+  const stopGroupRecording = () => {
+    if (groupRecorderRef.current?.state === "recording") groupRecorderRef.current.stop();
   };
 
   const createGroup = async () => {
@@ -4799,7 +5015,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
   /* ── APPARENCE ── */
   if (activeGroupId !== null && showGrpApparence) {
     const grp = chatGroups.find(g => g.id === activeGroupId);
-    const grpColor = ["#EC4899","#8B5CF6","#F97316","var(--bp-primary)","#0EA5E9","#0EA5E9","#F59E0B"][activeGroupId % 7];
+    const grpColor = grp?.name === "Oui" ? "#8B5CF6" : ["#EC4899","#8B5CF6","#F97316","var(--bp-primary)","#0EA5E9","#0EA5E9","#F59E0B"][activeGroupId % 7];
     const PALETTE = ["#2563EB","#0EA5E9","#22C55E","#16A34A","#F59E0B","#F97316","#EF4444","#EC4899","#8B5CF6","#6366F1","#14B8A6","#0F766E","#854D0E","#92400E","#1E293B","#64748B"];
     const selColor = grpApparenceColor || grpColor;
     const setSelColor_ = setGrpApparenceColor;
@@ -6022,14 +6238,24 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     const isNewGroup = gmsgs.filter(m => m.type !== "system").length === 0;
     const showBanner = !dismissedAddBanner.has(activeGroupId);
     const showInfoCard = isNewGroup && !dismissedInfoPanel.has(activeGroupId);
+    const canManageGroup = grp?.role === "owner" || grp?.role === "admin";
 
     activeChatView = (
       <div style={{ position:"relative", flex: 1, display:"flex", flexDirection:"column", zIndex:10, overflow:"hidden",
         backgroundImage:`url(${import.meta.env.BASE_URL}wallpapers/bp-chat-bg.jpg)`,
         backgroundSize:"cover", backgroundRepeat:"no-repeat", backgroundPosition:"center" }}>
         <style>{`
-          .bp-msg-mine   { background:#C8E6B2; color:#14532D; border-radius:16px 16px 4px 16px; box-shadow:0 1px 2px rgba(0,0,0,0.10); }
+          .bp-msg-mine   { background:#dcfbd0; color:#17241c; border-radius:20px 20px 4px 20px; box-shadow:0 1px 2px rgba(0,0,0,0.07); }
           .bp-msg-theirs { background:#fff;    color:#111; border-radius:4px 16px 16px 16px; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
+          .bp-group-add-banner-wrap { padding:12px 12px 0; flex-shrink:0; animation:grp-slide-in .15s ease; }
+          .bp-group-add-banner { min-height:50px; box-sizing:border-box; background:rgba(255,255,255,.91); border:1px solid rgba(255,255,255,.72); border-radius:18px; padding:0 44px 0 16px; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 12px rgba(47,104,56,.16); position:relative; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+          .bp-group-composer { padding:14px 12px max(12px,env(safe-area-inset-bottom)) 14px !important; gap:4px !important; }
+          .bp-group-composer > div { min-height:61px; padding:0 14px !important; gap:8px; }
+          .bp-group-composer > button { width:60px !important; height:61px !important; }
+          .bp-group-composer > div > button:first-child { width:36px; height:36px; justify-content:center; }
+          .bp-group-composer > div > button:first-child svg { width:28px; height:28px; }
+          .bp-group-composer textarea { font-size:18px !important; }
+          @media (max-width:360px) { .bp-group-add-banner-wrap { padding-left:10px;padding-right:10px } .bp-group-add-banner { min-height:48px } }
           textarea:focus { outline:none !important; box-shadow:none !important; border:none !important; }
           textarea { -webkit-appearance:none; scrollbar-width:none; }
           textarea::-webkit-scrollbar { display:none; }
@@ -6075,15 +6301,15 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
           </div>
         ) : (
           /* ── NORMAL header — Telegram compact ── */
-          <div style={{ background:"#fff", padding:"5px 4px 5px 2px", display:"flex", alignItems:"center", gap:6, flexShrink:0, borderBottom:"1px solid #E5E7EB", boxShadow:"0 1px 3px rgba(0,0,0,0.04)", position:"relative" }}>
-            <button onClick={() => { setActiveGroupId(null); setShowGroupInfo(false); setShowGrpMenu(false); }}
-              style={{ background:"none", border:"none", cursor:"pointer", padding:"8px 2px 8px 6px", display:"flex", alignItems:"center", flexShrink:0 }}>
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#111827" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          <div style={{ background:"#fff", padding:"5px 4px 5px 2px", minHeight:68, boxSizing:"border-box", display:"flex", alignItems:"center", gap:6, flexShrink:0, borderBottom:"1px solid #E5E7EB", boxShadow:"0 1px 3px rgba(0,0,0,0.04)", position:"relative" }}>
+            <button aria-label="Retour aux discussions" onClick={() => { setActiveGroupId(null); setShowGroupInfo(false); setShowGrpMenu(false); }}
+              style={{ background:"none", border:"none", cursor:"pointer", width:44, height:44, padding:0, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#16883d" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
             <div onClick={() => setShowGroupInfo(true)}
-              style={{ width:38, height:38, borderRadius:"50%", background:grpColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:15, cursor:"pointer", flexShrink:0 }}>
+              style={{ width:48, height:48, borderRadius:"50%", background:grpColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:18, cursor:"pointer", flexShrink:0, marginRight:8 }}>
               {grp?.avatarUrl
-                ? <img src={grp.avatarUrl} style={{ width:38, height:38, borderRadius:"50%", objectFit:"cover" }} alt={grp.name} />
+                ? <img src={grp.avatarUrl} style={{ width:48, height:48, borderRadius:"50%", objectFit:"cover" }} alt={grp.name} />
                 : grpInitial}
             </div>
             <div style={{ flex:1, minWidth:0, cursor:"pointer" }} onClick={() => setShowGroupInfo(true)}>
@@ -6140,32 +6366,34 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
 
         {/* ══ ADD MEMBERS BANNER ══ */}
         {showBanner && (
-          <div style={{ padding:"8px 12px 0", flexShrink:0, animation:"grp-slide-in 0.15s ease" }}>
-            <div style={{ background:"#fff", borderRadius:14, padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.14)", position:"relative" }}>
-              <button onClick={() => setShowGroupInfo(true)}
-                style={{ background:"none", border:"none", cursor:"pointer", color:"var(--bp-primary)", fontWeight:700, fontSize:15, padding:0, flex:1, textAlign:"center" }}>
-                Add Members
+          <div className="bp-group-add-banner-wrap">
+            <div className="bp-group-add-banner">
+              <button onClick={() => { setShowGrpMembers(true); setGrpAddMembersOpen(true); }} aria-label="Ajouter des membres au groupe"
+                style={{ background:"none", border:"none", cursor:"pointer", color:"#16883d", fontWeight:700, fontSize:15, padding:0, flex:1, textAlign:"center", display:"flex", alignItems:"center", justifyContent:"center", gap:9 }}>
+                <svg viewBox="0 0 24 24" width="25" height="25" fill="currentColor" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M2 20a7 7 0 0 1 14 0v1H2z"/><path d="M19 6V2h2v4h3v2h-3v4h-2V8h-3V6z"/></svg>
+                Ajouter des membres
               </button>
               <button onClick={() => setDismissedAddBanner(s => { const n = new Set(s); n.add(activeGroupId); return n; })}
-                style={{ position:"absolute", right:14, background:"none", border:"none", cursor:"pointer", color:"#9CA3AF", fontSize:18, lineHeight:1, padding:0 }}>✕</button>
+                aria-label="Fermer la bannière d’ajout de membres"
+                style={{ position:"absolute", right:12, width:28, height:36, display:"grid", placeItems:"center", background:"none", border:"none", cursor:"pointer", color:"#9CA3AF", padding:0 }}>
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+              </button>
             </div>
           </div>
         )}
 
         {/* ══ MESSAGES AREA ══ */}
-        <div style={{ flex:1, overflowY:"auto", padding:"12px 10px 6px", display:"flex", flexDirection:"column", gap:2 }}>
-
-          {/* Date pill */}
-          <div style={{ alignSelf:"center", background:"rgba(0,0,0,0.32)", borderRadius:20, padding:"4px 14px", marginBottom:6 }}>
-            <span style={{ fontSize:12, color:"#fff", fontWeight:500 }}>Aujourd'hui</span>
-          </div>
+        <div ref={groupScrollRef} onScroll={e => {
+          const el = e.currentTarget;
+          groupNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 76;
+        }} style={{ flex:1, minHeight:0, overflowY:"auto", overscrollBehavior:"contain", WebkitOverflowScrolling:"touch", padding:"10px 12px 6px", display:"flex", flexDirection:"column", gap:2 }}>
 
           {(() => {
             const grpMatches = showGrpSearch && grpSearchQ.trim()
               ? gmsgs.filter(m => m.type !== "system" && m.text.toLowerCase().includes(grpSearchQ.toLowerCase()))
               : [];
             const grpHighlightId = grpMatches[grpSearchIdx]?.id ?? null;
-            return gmsgs.map((msg, i) => {
+            const renderedMessages = gmsgs.map((msg, i) => {
               const isFirst = i === 0 || gmsgs[i - 1]?.mine !== msg.mine;
               const isMatch = showGrpSearch && grpSearchQ.trim() && msg.type !== "system" && msg.text.toLowerCase().includes(grpSearchQ.toLowerCase());
               const isCurrent = msg.id === grpHighlightId;
@@ -6173,7 +6401,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
                 const botMenu = msg.text.includes("__botmenu__");
                 const isAdm = grp?.role === "owner" || grp?.role === "admin";
                 return (
-                  <div key={msg.id} style={{ alignSelf:"center", background:"rgba(0,0,0,0.32)", borderRadius:20, padding:"4px 14px", margin:"4px auto" }}>
+                  <div key={msg.id} style={{ alignSelf:"center", background:"rgba(0,0,0,0.32)", borderRadius:20, padding:"6px 14px", margin:"4px auto" }}>
                     <span style={{ fontSize:12, color:"#fff", fontWeight:500 }}>{msg.text.replace(/__botmenu__/g, "").trim()}</span>
                     {botMenu && isAdm && (
                       <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center", marginTop:6 }}>
@@ -6187,27 +6415,55 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
               }
               return (
                 <div key={msg.id} id={`grp-msg-${msg.id}`}
-                  style={{ display:"flex", justifyContent:msg.mine?"flex-end":"flex-start", alignItems:"flex-end", gap:6, marginTop:isFirst?6:1,
+                  style={{ display:"flex", justifyContent:msg.mine?"flex-end":"flex-start", alignItems:"flex-end", gap:8, marginTop:isFirst?6:1,
                     ...(isCurrent ? { scrollMarginTop: 60 } : {}) }}>
                   {!msg.mine && (
-                    <div style={{ width:28, flexShrink:0, alignSelf:"flex-end", paddingBottom:2 }}>
-                      {isFirst && <div style={{ width:26, height:26, borderRadius:"50%", background:CONV_COLORS[Math.abs(msg.text.length+i)%CONV_COLORS.length], display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:10, fontWeight:700 }}>{mkInitials(msg.senderName)}</div>}
+                    <div style={{ width:32, flexShrink:0, alignSelf:"flex-end", paddingBottom:2 }}>
+                      {isFirst && <div style={{ width:32, height:32, borderRadius:"50%", background:CONV_COLORS[Math.abs(msg.text.length+i)%CONV_COLORS.length], display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontWeight:700 }}>{mkInitials(msg.senderName)}</div>}
                     </div>
                   )}
                   <div style={{ maxWidth:"72%", display:"flex", flexDirection:"column" }}>
-                    {!msg.mine && isFirst && <div style={{ fontSize:11, color:"var(--bp-primary)", fontWeight:700, marginBottom:2, paddingLeft:2 }}>{msg.senderName}</div>}
+                    {!msg.mine && isFirst && <div style={{ fontSize:13, color:"var(--bp-primary)", fontWeight:700, marginBottom:2, paddingLeft:4 }}>{msg.senderName}</div>}
                     <div className={msg.mine?"bp-msg-mine":"bp-msg-theirs"}
-                      style={{ padding:"8px 12px 6px", fontSize:14.5, lineHeight:1.45, wordBreak:"break-word",
+                      style={{ padding:"8px 14px 6px", fontSize:16, lineHeight:1.45, wordBreak:"break-word",
                         ...(isCurrent ? { outline:"2.5px solid var(--bp-primary)", outlineOffset:"1px" } : isMatch ? { opacity:0.65 } : {}) }}>
-                      {msg.text}
-                      <div style={{ fontSize:10, marginTop:2, color:"#888", textAlign:"right" }}>
-                        {msg.time}{(grp?.role === "owner" || grp?.role === "admin") && <span style={{marginLeft:6}}>#{msg.id}</span>}
-                        {msg.mine && <span style={{ marginLeft:3, color:"var(--bp-primary)" }}>✓✓</span>}
+                      {msg.attachment?.type === "image" || msg.attachment?.type === "sticker" ? (
+                        <img src={msg.attachment.label} alt={msg.attachment.extra || "Image partagée"} onClick={() => openImageViewer(msg.attachment!.label)}
+                          style={{ display:"block", maxWidth:"min(230px, 62vw)", maxHeight:260, objectFit:"cover", borderRadius:10, cursor:"zoom-in" }} />
+                      ) : msg.attachment?.type === "audio" ? (
+                        <div style={{ minWidth:190, maxWidth:230 }}><audio controls preload="metadata" src={msg.attachment.label} style={{ display:"block", width:"100%", height:36 }} /><span style={{ display:"block", fontSize:11, color:"#68716b", textAlign:"right", marginTop:2 }}>Message vocal · {msg.attachment.extra}</span></div>
+                      ) : msg.attachment?.type === "doc" && /\.(mp4|m4v|mov|webm|ogv)$/i.test(msg.attachment.extra || "") ? (
+                        <video controls preload="metadata" src={msg.attachment.label} style={{ display:"block", width:"min(230px, 62vw)", maxHeight:260, borderRadius:10, background:"#111" }} />
+                      ) : msg.attachment?.type === "doc" ? (
+                        <a href={msg.attachment.label} target="_blank" rel="noreferrer" download={msg.attachment.extra || undefined}
+                          style={{ display:"flex", alignItems:"center", gap:9, maxWidth:230, color:"inherit", textDecoration:"none", padding:"3px 1px" }}>
+                          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg>
+                          <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{msg.attachment.extra || "Document"}</span>
+                        </a>
+                      ) : msg.text}
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"flex-end", gap:4, whiteSpace:"nowrap", fontSize:12, lineHeight:"15px", marginTop:2, color:"#888" }}>
+                        <span style={{ whiteSpace:"nowrap" }}>{msg.time}{msg.mine && !msg.sent ? <span style={{marginLeft:5}}>Envoi…</span> : (grp?.role === "owner" || grp?.role === "admin") && <span style={{marginLeft:5}}>#{msg.id}</span>}</span>
+                        {msg.mine && msg.sent && <svg aria-label="Envoyé au serveur" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="var(--bp-primary)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex:"none" }}><path d="m3 8 2.5 2.5L13 3.8"/></svg>}
                       </div>
                     </div>
                   </div>
                 </div>
               );
+            });
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            return renderedMessages.flatMap((message, index) => {
+              const date = new Date(gmsgs[index].createdAt ?? today.toISOString());
+              const previous = index ? new Date(gmsgs[index - 1].createdAt ?? today.toISOString()) : null;
+              if (previous?.toDateString() === date.toDateString()) return [message];
+              const label = date.toDateString() === today.toDateString() ? "Aujourd’hui"
+                : date.toDateString() === yesterday.toDateString() ? "Hier"
+                : date.toLocaleDateString("fr", { day:"numeric", month:"long", year:"numeric" });
+              return [
+                <div key={`group-day-${gmsgs[index].id}`} style={{ alignSelf:"center", background:"rgba(74,105,79,.52)", borderRadius:20, padding:"7px 14px", marginBottom:6, color:"#fff", fontSize:14, lineHeight:"19px", fontWeight:500 }}>{label}</div>,
+                message,
+              ];
             });
           })()}
 
@@ -6229,7 +6485,11 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
           <div ref={groupBottomRef} />
         </div>
 
-        {activeGroupId && <GroupBotStatus key={activeGroupId} groupId={activeGroupId} />}
+        {activeGroupId && <GroupBotStatus key={activeGroupId} groupId={activeGroupId}
+          onSettings={canManageGroup ? () => { const group = chatGroups.find(g=>g.id===activeGroupId); setGrpEditName(group?.name??""); setGrpEditDesc(""); setShowGroupInfo(true); setShowGrpEdit(true); } : undefined}
+          onModeration={canManageGroup ? () => { setBotSection("moderation"); setShowChatBot(true); } : undefined}
+          onStatistics={() => setShowGrpStats(true)}
+        />}
         {/* ── PARAMÈTRES sticky row (admin shortcut) ── */}
         {(() => {
           // Prefer the role from the group list (loaded upfront) to avoid depending on the
@@ -6237,21 +6497,7 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
           const grpEntry = chatGroups.find(g => g.id === activeGroupId);
           const myRole = grpEntry?.role ?? (groupInfo?.members ?? []).find(m => m.userId === meId)?.role;
           if (myRole !== "owner" && myRole !== "admin") return null;
-          return (
-            <div style={{ flexShrink:0, background:"rgba(255,255,255,0.96)", borderTop:"1px solid rgba(0,0,0,0.06)", display:"flex", alignItems:"center", justifyContent:"center", padding:"6px 16px", gap:10 }}>
-              <button onClick={() => { const grp = chatGroups.find(g=>g.id===activeGroupId); setGrpEditName(grp?.name??""); setGrpEditDesc(""); setShowGrpEdit(true); }}
-                style={{ background:"none", border:"none", cursor:"pointer", fontSize:13.5, fontWeight:700, color:"var(--bp-primary)", letterSpacing:1.2, padding:"4px 16px" }}>
-                PARAMÈTRES
-              </button>
-              <div style={{ width:1, height:16, background:"rgba(0,0,0,0.12)" }} />
-              <button onClick={() => { setBotSection(undefined); setShowChatBot(true); }} style={{ border:0, background:"none", cursor:"pointer", padding:"8px 4px", color:"var(--bp-primary)", fontSize:12, fontWeight:700 }}>
-                Bot de modération
-              </button>
-              <button onClick={() => setShowGrpStats(true)} style={{ background:"none", cursor:"pointer", width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", borderRadius:"50%", border:"1.5px solid var(--bp-primary)" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--bp-primary)" }}><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg>
-              </button>
-            </div>
-          );
+          return null;
         })()}
 
         {/* ══ INPUT BAR — Telegram pill ══ */}
@@ -6259,17 +6505,19 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
           setShowChatBot(false);
           refreshGroupInfo();
           apiGetChatGroupMessages(activeGroupId).then(msgs => setGroupMsgs(prev => ({ ...prev, [activeGroupId]: msgs.map(m => ({
-            id:m.id, text:m.content, senderName:m.senderName, mine:m.senderId===meId,
-            time:new Date(m.createdAt).toLocaleTimeString("fr", {hour:"2-digit",minute:"2-digit"}), type:m.type,
+            id:m.id, ...parseGroupContent(m.content), senderName:m.senderName, mine:m.senderId===meId,
+            time:new Date(m.createdAt).toLocaleTimeString("fr", {hour:"2-digit",minute:"2-digit"}), createdAt:m.createdAt, type:m.type, sent:m.senderId===meId,
           })) }))).catch(() => {});
         }} />}
         {groupSendError?.groupId === activeGroupId && <div role="alert" style={{ color:"#a61b1b", background:"#fff0ef", padding:"10px 14px", fontSize:13 }}>
           {groupSendError.message}
         </div>}
-        <div style={{ flexShrink:0, padding:"6px 10px 10px", display:"flex", alignItems:"center", gap:8 }}>
+        <div className="bp-group-composer" style={{ flexShrink:0, padding:"6px 10px max(10px, env(safe-area-inset-bottom))", display:"flex", alignItems:"center", gap:8 }}>
+          <input ref={groupFileInputRef} type="file" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt" hidden
+            onChange={event => { const file = event.currentTarget.files?.[0]; if (file) void sendGroupFile(file); event.currentTarget.value = ""; }} />
           <div style={{ flex:1, display:"flex", alignItems:"center", background:"#fff", borderRadius:9999, padding:"0 6px 0 14px", minHeight:50, boxShadow:"0 1px 4px rgba(0,0,0,0.12)" }}>
             {/* Emoji */}
-            <button style={{ background:"none", border:"none", cursor:"pointer", padding:0, flexShrink:0, display:"flex", alignItems:"center", marginRight:4 }}>
+            <button onClick={() => void toggleGroupEmojiPicker()} aria-label="Ouvrir les emojis" aria-expanded={showEmojiPicker} style={{ background:"none", border:"none", cursor:"pointer", padding:0, flexShrink:0, display:"flex", alignItems:"center", marginRight:4 }}>
               <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 13s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1.2" fill="#9CA3AF"/><circle cx="15" cy="9" r="1.2" fill="#9CA3AF"/></svg>
             </button>
             {/* Text */}
@@ -6281,23 +6529,54 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
               style={{ flex:1, background:"transparent", border:"none", outline:"none", resize:"none", padding:"0 6px", fontSize:15, color:"#000", minWidth:0, lineHeight:"22px", height:"22px", maxHeight:"130px", overflowY:"hidden", transition:"height 0.15s ease", display:"block", alignSelf:"center", fontFamily:"inherit", WebkitAppearance:"none" as React.CSSProperties["WebkitAppearance"] }} />
             {/* Attachment */}
             {!groupNewMsg.trim() && (
-              <button style={{ background:"none", border:"none", cursor:"pointer", padding:0, flexShrink:0, display:"flex", alignItems:"center", marginRight:6 }}>
+              <button type="button" onClick={() => groupFileInputRef.current?.click()} aria-label="Joindre un fichier" title={groupMediaBusy ? "Envoi en cours" : "Joindre un fichier"} disabled={groupMediaBusy}
+                style={{ background:"none", border:"none", cursor:groupMediaBusy?"wait":"pointer", padding:0, flexShrink:0, display:"flex", alignItems:"center", marginRight:6, opacity:groupMediaBusy ? 0.5 : 1 }}>
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               </button>
             )}
           </div>
           {/* Mic / Send */}
           {groupNewMsg.trim() ? (
-            <button onClick={sendGroupMsg}
+            <button type="button" onClick={sendGroupMsg} aria-label="Envoyer le message"
               style={{ background:"var(--bp-primary)", border:"none", borderRadius:"50%", width:50, height:50, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 3px 12px rgba(34,197,94,0.45)", cursor:"pointer" }}>
               <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           ) : (
-            <button style={{ background:"var(--bp-primary)", border:"none", borderRadius:"50%", width:50, height:50, cursor:"pointer", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 3px 12px rgba(34,197,94,0.45)" }}>
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <button type="button" onClick={groupRecording ? stopGroupRecording : () => void startGroupRecording()}
+              aria-label={groupRecording ? `Arrêter l’enregistrement vocal (${groupRecordingSeconds} s)` : "Enregistrer un message vocal"}
+              title={groupRecording ? `Arrêter · ${groupRecordingSeconds}s` : "Enregistrer un message vocal"}
+              disabled={groupMediaBusy}
+              style={{ background:groupRecording?"#dc2626":"var(--bp-primary)", border:"none", borderRadius:"50%", width:50, height:50, cursor:groupMediaBusy?"wait":"pointer", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 3px 12px rgba(34,197,94,0.32)" }}>
+              {groupRecording ? <svg viewBox="0 0 24 24" width="19" height="19" fill="#fff"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> : <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>}
             </button>
           )}
         </div>
+        {showEmojiPicker && activeGroupId !== null && (
+          <EmojiPicker isOpen={showEmojiPicker} isClosing={pickerClosing} onClose={() => void toggleGroupEmojiPicker()}
+            onSelectEmoji={emoji => {
+              const input = grpInputRef.current;
+              const cursor = input?.selectionStart ?? groupNewMsg.length;
+              setGroupNewMsg(prev => prev.slice(0, cursor) + emoji + prev.slice(cursor));
+              window.setTimeout(() => {
+                input?.focus({ preventScroll: true });
+                input?.setSelectionRange(cursor + emoji.length, cursor + emoji.length);
+              }, 0);
+            }}
+            onSelectMedia={(item, type) => {
+              const groupId = activeGroupId;
+              if (!groupId) return;
+              const isOfficialSticker = item.id.startsWith("brutepawa-");
+              const filename = isOfficialSticker ? `${item.id}-animated.webp` : `GIPHY-${item.id}.gif`;
+              const sticker = type === "sticker";
+              apiSendChatGroupMessage(groupId, `${sticker ? "__sticker__" : "__image__"}:${item.url}:${filename}:0`)
+                .then(sent => setGroupMsgs(prev => ({ ...prev, [groupId]: [...(prev[groupId] ?? []), {
+                  id: sent.id, ...parseGroupContent(sent.content), senderName: sent.senderName, mine: sent.senderId === meId,
+                  time: new Date(sent.createdAt).toLocaleTimeString("fr", { hour:"2-digit", minute:"2-digit" }), createdAt: sent.createdAt, type: sent.type, sent: true,
+                }] })))
+                .catch(error => setGroupSendError({ groupId, message: error instanceof Error ? error.message : "Envoi du média échoué" }));
+              setShowEmojiPicker(false);
+            }} />
+        )}
 
         {/* ── DIALOG: EFFACER L'HISTORIQUE ── */}
         {showClearHist && (
@@ -9354,12 +9633,12 @@ export default function Messages({ initialUserId, initialGroupId }: { initialUse
     `}</style>
 
     <div
-      className="sc-fixed-escape bp-messages-root"
+      className={`${activeGroupId !== null ? "" : "sc-fixed-escape "}bp-messages-root`}
       style={{
         position: "fixed",
         top: vpHeight !== null ? vpOffset : 0,
-        bottom: vpHeight !== null ? "auto" : "58px",
-        height: vpHeight !== null ? Math.max(0, vpHeight - 58) : undefined,
+        bottom: activeGroupId !== null ? 0 : vpHeight !== null ? "auto" : "58px",
+        height: vpHeight !== null ? Math.max(0, vpHeight - (activeGroupId !== null ? 0 : 58)) : undefined,
         left: 0,
         right: 0,
         display: "flex",

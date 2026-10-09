@@ -1732,6 +1732,15 @@ span[style*="color:var(--bp-primary)"] {
   zoom: calc(1 / 0.85);
 }
 
+/* Group conversations use their native mobile geometry; private chats and
+   settings keep the existing compact 85% Messages wrapper. */
+body.bp-group-chat-native-scale .sc-zoom-wrap {
+  zoom: 1 !important;
+}
+body.bp-group-chat-native-scale [data-bp-install-banner] {
+  display: none;
+}
+
 /* ── Layout CSS fixed elements auto-corrected when inside .sc-zoom-wrap ── */
 /* These classes are defined in index.css with position:fixed and are used   */
 /* by Layout.tsx. They are scoped so the counter-zoom only activates under   */
